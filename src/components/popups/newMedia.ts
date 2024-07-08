@@ -770,7 +770,7 @@ export default class PopupNewMedia extends PopupElement {
 
       let error: Error;
       try {
-        const promise = onMediaLoad(video);
+        const promise = onMediaLoad(video as HTMLMediaElement);
         await handleVideoLeak(video, promise);
       } catch(err) {
         error = err as any;
