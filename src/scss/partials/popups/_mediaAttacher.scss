@@ -187,7 +187,7 @@
       position: absolute;
     }
 
-    img, 
+    img,
     video {
       object-fit: cover;
       width: 100%;
@@ -209,6 +209,45 @@
     position: relative;
     border-radius: inherit;
     overflow: hidden;
+
+  }
+
+  .popup-item:hover > .popup-item-tools {
+    opacity: 1;
+  }
+  .popup-item > .popup-item-tools {
+    // background-color: plum;
+    transition: all 0.2s;
+    background-color: rgba($color: black, $alpha: 0.2);
+    backdrop-filter: blur(35px);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+
+    bottom: 6px;
+    display: flex;
+    gap: 16px;
+    width: 112px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    padding-top: 5px;
+    border-radius: 16px;
+    opacity: 0;
+
+    .popup-item-tools-button {
+      color: white;
+      opacity: 0.7;
+      height: 20px;
+      width: 20px;
+      transition: all 0.1s;
+      &:hover {
+        opacity: 1;
+        color: rgb(255, 255, 255);
+      }
+    }
   }
 
   .popup-photo > .popup-item + .popup-item {
