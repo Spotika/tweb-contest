@@ -56,6 +56,8 @@ import {Accessor, createRoot, createSignal, Setter} from 'solid-js';
 import SelectedEffect from '../chat/selectedEffect';
 import Icon from '../icon';
 import Button from '../button';
+import MediaEditor from '../mediaEditor/mediaEditor';
+import {render} from 'solid-js/web';
 
 type SendFileParams = SendFileDetails & {
   file?: File,
@@ -159,7 +161,23 @@ export default class PopupNewMedia extends PopupElement {
     toolPanel.append(toolButton(
       'tools',
       () => {
-        console.log('tools');
+        const mediaEditorContainer = document.createElement('div');
+        mediaEditorContainer.classList.add('media-editor-container');
+        document.body.append(mediaEditorContainer);
+
+        render(() => MediaEditor({
+          parentElement: mediaEditorContainer,
+          file: item.file,
+          save_modified_file: async(modified_file: File) => {
+            this.files = this.files.map((file) => {
+              if(file.name == modified_file.name) {
+                return modified_file;
+              }
+              return file;
+            });
+            this.attachFiles();
+          }
+        }), mediaEditorContainer);
       }
     ));
     toolPanel.append(toolButton(
