@@ -168,7 +168,7 @@ export default class PopupNewMedia extends PopupElement {
         render(() => MediaEditor({
           parentElement: mediaEditorContainer,
           file: item.file,
-          save_modified_file: async(modified_file: File) => {
+          saveModifiedFile: async(modified_file: File) => {
             this.files = this.files.map((file) => {
               if(file.name == modified_file.name) {
                 return modified_file;

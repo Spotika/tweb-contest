@@ -1,6 +1,6 @@
 import renderImageFromUrl, {renderImageFromUrlPromise} from '../../helpers/dom/renderImageFromUrl';
 import apiManagerProxy from '../../lib/mtproto/mtprotoworker';
-import {createEffect, createSignal} from 'solid-js'
+import {JSXElement, createEffect, createSignal} from 'solid-js'
 import Icon from '../icon';
 import {ButtonIconTsx} from '../buttonIconTsx';
 import getProxiedManagers from '../../lib/appManagers/getProxiedManagers';
@@ -115,12 +115,23 @@ class Panel {
   }
 
   private createPages = () => {
-    this.tabs.enchance.textContent = '1';
-    this.tabs.crop.textContent = '2';
-    this.tabs.text.textContent = '3';
-    this.tabs.edit.textContent = '4';
-    this.tabs.stickers.textContent = '5';
+    // this.tabs.enchance.textContent = '1';
+    render(this.enchancePanel, this.tabs.enchance);
+    render(this.enchancePanel, this.tabs.crop);
+    render(this.enchancePanel, this.tabs.text);
+    render(this.enchancePanel, this.tabs.edit);
+    render(this.enchancePanel, this.tabs.stickers);
+    // this.tabs.crop.textContent = '2';
+    // this.tabs.text.textContent = '3';
+    // this.tabs.edit.textContent = '4';
+    // this.tabs.stickers.textContent = '5';
     console.log(this.tabs);
+  }
+
+  private enchancePanel = (): JSXElement => {
+    return <>
+      1
+    </>
   }
 }
 

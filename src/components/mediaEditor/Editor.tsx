@@ -39,19 +39,22 @@ class Editor {
     this.canvas = document.createElement('canvas');
 
     this.ctx = this.canvas.getContext('2d');
+    this.ctx.filter = 'blur(4px)';
 
     this.itemDiv.append(this.canvas);
     renderElement.replaceWith(this.itemDiv);
 
-    (async() => {
+    // (async() => {
+    createEffect(async() => {
       const img = new Image();
       const url = await apiManagerProxy.invoke('createObjectURL', file);
       await renderImageFromUrlPromise(img, url);
       // draw image on canvas
+
       this.canvas.width = img.width;
       this.canvas.height = img.height;
       this.ctx.drawImage(img, 0, 0);
-    })().then();
+    });
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
