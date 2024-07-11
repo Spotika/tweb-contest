@@ -150,8 +150,8 @@ export default class PopupNewMedia extends PopupElement {
     ): HTMLElement => {
       const iconButton = document.createElement('button');
       iconButton.append(Icon(icon));
-      iconButton.classList.add('popup-item-tools-button')
-      iconButton.onclick = onclick
+      iconButton.classList.add('popup-item-tools-button');
+      iconButton.onclick = onclick;
       return iconButton;
     }
 
@@ -159,7 +159,7 @@ export default class PopupNewMedia extends PopupElement {
 
     // buttons
     toolPanel.append(toolButton(
-      'tools',
+      'enhance',
       () => {
         const mediaEditorContainer = document.createElement('div');
         mediaEditorContainer.classList.add('media-editor-container');

@@ -33,7 +33,7 @@ class Editor {
 
   private ctx: CanvasRenderingContext2D;
 
-  constructor(file: File, render_element: HTMLElement) {
+  constructor(file: File, renderElement: HTMLElement) {
     this.itemDiv = document.createElement('div');
     this.itemDiv.classList.add('editor-container');
     this.canvas = document.createElement('canvas');
@@ -41,7 +41,7 @@ class Editor {
     this.ctx = this.canvas.getContext('2d');
 
     this.itemDiv.append(this.canvas);
-    render_element.replaceWith(this.itemDiv);
+    renderElement.replaceWith(this.itemDiv);
 
     (async() => {
       const img = new Image();
@@ -54,11 +54,11 @@ class Editor {
     })().then();
   }
 
-  public async getModifiedFile(new_file_name: string): Promise<File> {
+  public async getModifiedFile(newFileName: string): Promise<File> {
     return fetch(this.canvas.toDataURL())
     .then(res => res.blob())
     .then(blob => {
-      const file = new File([blob], new_file_name, blob);
+      const file = new File([blob], newFileName, blob);
       return file;
     });
   }

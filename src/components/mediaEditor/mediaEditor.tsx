@@ -13,17 +13,25 @@ const MediaEditor = (
   }
 ) => {
   let editor: Editor;
+  let panel: Panel;
   let editorContainer: HTMLDivElement;
+  let panelContainer: HTMLDivElement;
 
   createEffect(() => {
     editor = new Editor(params.file, editorContainer);
+    panel = new Panel(panelContainer, exitEditor);
   });
+
+  const exitEditor = () => {
+    params.parentElement.remove();
+  }
 
   return <>
     {/* <canvas ref={canvas}></canvas> */}
     {/* <Editor file={params.file}/> */}
     <div ref={editorContainer}></div>
-    <Panel/>
+    <div ref={panelContainer}></div>
+    {/* <Panel close={exitEditor}/> */}
     {/* <button onclick={() => {exitEditor(true)}}> image</button> */}
   </>
 };

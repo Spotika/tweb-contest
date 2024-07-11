@@ -23,6 +23,7 @@
   height: 100%;
   background-color: #212121;
   margin-left: auto;
+  overflow: hidden;
 
   .navbar-tabs {
     padding: 0 8px;
@@ -41,7 +42,7 @@
         }
       }
       .actions {
-        color: #AAAA;
+        color: #aaaa;
         display: flex;
         & > *:first-child {
           margin-right: 8px;
@@ -60,5 +61,24 @@
     // .tabs {
 
     // }
+  }
+
+  .menu-horizontal-div {
+    &::before, &::after {
+      display: none;
+    }
+  }
+
+  .editor-panel-tabs {
+    padding: 0 4px;
+    padding: 0;
+    justify-content: space-between;
+    .menu-horizontal-div-item {
+      i {
+        bottom: -11px;
+      }
+      font-size: 24px;
+      max-width: 48px;
+    }
   }
 }
