@@ -8,6 +8,7 @@ import Scrollable from '../scrollable';
 import {render} from 'solid-js/web';
 import ripple from '../ripple';
 import {horizontalMenu} from '../horizontalMenu';
+import RangeInput from './editorRangeInput';
 
 type TabInfo = {
   type: 'enchance' |
@@ -115,22 +116,33 @@ class Panel {
   }
 
   private createPages = () => {
-    // this.tabs.enchance.textContent = '1';
     render(this.enchancePanel, this.tabs.enchance);
-    render(this.enchancePanel, this.tabs.crop);
-    render(this.enchancePanel, this.tabs.text);
-    render(this.enchancePanel, this.tabs.edit);
-    render(this.enchancePanel, this.tabs.stickers);
-    // this.tabs.crop.textContent = '2';
-    // this.tabs.text.textContent = '3';
-    // this.tabs.edit.textContent = '4';
-    // this.tabs.stickers.textContent = '5';
-    console.log(this.tabs);
+    // render(this.enchancePanel, this.tabs.crop);
+    // render(this.enchancePanel, this.tabs.text);
+    // render(this.enchancePanel, this.tabs.edit);
+    // render(this.enchancePanel, this.tabs.stickers);
   }
 
   private enchancePanel = (): JSXElement => {
+    let rangeInput: HTMLInputElement;
+    createEffect(() => {
+      rangeInput = new RangeInput({
+        renderElement: rangeInput,
+        input: {
+          min: '-50',
+          max: '50',
+          step: '1',
+          initialValue: '0',
+          splitPrecent: 50
+        }
+      }).input;
+
+      rangeInput.addEventListener('input', () => {
+        console.log(rangeInput.value);
+      });
+    })
     return <>
-      1
+      <input ref={rangeInput}></input>
     </>
   }
 }

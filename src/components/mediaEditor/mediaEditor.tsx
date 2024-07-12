@@ -1,8 +1,8 @@
 import renderImageFromUrl, {renderImageFromUrlPromise} from '../../helpers/dom/renderImageFromUrl';
 import apiManagerProxy from '../../lib/mtproto/mtprotoworker';
 import {createEffect, createSignal} from 'solid-js'
-import Panel from './Panel';
-import Editor from './Editor';
+import Panel from './panel';
+import Editor from './editor';
 import {ButtonIconTsx} from '../buttonIconTsx';
 
 
