@@ -1,33 +1,32 @@
 
 class RangeInput {
   public input: HTMLInputElement;
-  private container: HTMLDivElement
+  public container: HTMLDivElement
 
-  constructor(params: {
-    renderElement: HTMLElement,
-    input: {
+  constructor(
+    // input: {
       min: string,
       max: string,
       step: string,
       initialValue: string,
-      splitPrecent: number;
-    }
-  }) {
+      splitPrecent: number
+    // }
+  ) {
     this.container = document.createElement('div')
-    params.renderElement.replaceWith(this.container);
+    // params.renderElement.replaceWith(this.container);
 
     this.container.classList.add('editor-range-container');
     const range = document.createElement('input');
     this.input = range;
 
     range.type = 'range';
-    range.value = params.input.initialValue;
-    range.min = params.input.min;
-    range.max = params.input.max;
-    range.step = params.input.step;
+    range.value = initialValue;
+    range.min = min;
+    range.max = max;
+    range.step = step;
     this.container.append(range);
 
-    const secondaryTextColor = getComputedStyle(this.container).getPropertyValue('--secondary-text-color');
+    const secondaryTextColor = getComputedStyle(document.body).getPropertyValue('--secondary-text-color');
     this.container.style.setProperty('--slider-track-color', `${secondaryTextColor}10`);
 
     const rangeFill = document.createElement('div');
@@ -40,12 +39,12 @@ class RangeInput {
       const max = Number(range.max);
       const percentage = (value - min) / (max - min) * 100;
 
-      if(percentage >= params.input.splitPrecent) {
-        rangeFill.style.left = `${params.input.splitPrecent}%`;
-        rangeFill.style.width = `calc(${percentage - params.input.splitPrecent}%)`;
+      if(percentage >= splitPrecent) {
+        rangeFill.style.left = `${splitPrecent}%`;
+        rangeFill.style.width = `calc(${percentage - splitPrecent}%)`;
       } else {
         rangeFill.style.left = `calc(${percentage}%)`;
-        rangeFill.style.width = `calc(${params.input.splitPrecent - percentage}%)`;
+        rangeFill.style.width = `calc(${splitPrecent - percentage}%)`;
       }
     }
     updateRangeFill();

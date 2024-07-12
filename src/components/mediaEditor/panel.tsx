@@ -10,44 +10,29 @@ import ripple from '../ripple';
 import {horizontalMenu} from '../horizontalMenu';
 import RangeInput from './editorRangeInput';
 
-type TabInfo = {
-  type: 'enchance' |
-        'crop' |
-        'text' |
-        'edit' |
-        'stickers';
-  icon: Icon;
+type EnhanceProperties = {
+  filter: string;
+  min: string;
+  max: string;
+  splitPrecent: number;
+  onChange: (newValue: number) => void;
+}
+
+export type EditorProperties = {
+  [key in Icon]: any;
+} | {
+  enhance: EnhanceProperties[];
 };
 
 class Panel {
   private container: HTMLDivElement;
-  private mediaTabs: TabInfo[] = [ // set type annotation
-    {
-      type: 'enchance',
-      icon: 'enhance'
-    },
-    {
-      type: 'crop',
-      icon: 'crop'
-    },
-    {
-      type: 'text',
-      icon: 'text'
-    },
-    {
-      type: 'edit',
-      icon: 'brush'
-    },
-    {
-      type: 'stickers',
-      icon: 'smile'
-    }
-  ];
+
   private selectTab;
-  private tabs: {[key in TabInfo['type']]: HTMLElement} = {} as any;
+  private tabs: {[key in keyof EditorProperties]: HTMLDivElement} = {} as any;
 
   constructor(
     renderElement: HTMLElement,
+    properties: EditorProperties,
     close: () => void
   ) {
     this.container = document.createElement('div');
@@ -73,35 +58,38 @@ class Panel {
         <div ref={tabsContainerRef}>
         </div>
       </>, this.container);
+
+    // tabs
     const nav = document.createElement('nav');
     nav.classList.add('editor-panel-tabs', 'menu-horizontal-div');
     const tabsMenu = nav;
 
-    for(const mediaTab of this.mediaTabs) {
+    for(const tabName of Object.keys(properties) as Array<keyof typeof properties>) {
       const menuTab = document.createElement('div');
       menuTab.classList.add('menu-horizontal-div-item', 'editor-panel-menu-div-item');
       const i = document.createElement('i');
-      const icon = Icon(mediaTab.icon, 'menu-horizontal-div-item-span');
+      const icon = Icon(tabName, 'menu-horizontal-div-item-span');
+
       icon.append(i);
-
       menuTab.append(icon);
-
       tabsMenu.append(menuTab);
     }
 
+    // containers
     const tabsContainer = document.createElement('div');
     tabsContainer.classList.add('editor-panel-tabs-container', 'tabs-container');
-    for(const mediaTab of this.mediaTabs) {
+
+    for(const tabName of Object.keys(properties) as Array<keyof typeof properties>) {
       const container = document.createElement('div');
-      container.classList.add('editor-panel-tab-container', 'editor-panel-container-' + mediaTab.type, 'tabs-tab');
+      container.classList.add('editor-panel-tab-container', 'editor-panel-container-' + tabName, 'tabs-tab');
 
       const content = document.createElement('div');
-      content.classList.add('editor-panel-content-container', 'editor-panel-content-' + mediaTab.type);
+      content.classList.add('editor-panel-content-container', 'editor-panel-content-' + tabName);
 
       container.append(content);
 
       tabsContainer.append(container);
-      this.tabs[mediaTab.type] = content;
+      this.tabs[tabName as keyof EditorProperties] = content;
     }
 
     this.selectTab = horizontalMenu(tabsMenu, tabsContainer);
@@ -111,39 +99,58 @@ class Panel {
       tabs.replaceWith(tabsMenu);
       tabsContainerRef.replaceWith(tabsContainer);
     });
-    this.createPages();
+
+
+    // Tabs creation
+    this.createEnhancePanel(properties.enhance);
     renderElement.replaceWith(this.container);
   }
 
-  private createPages = () => {
-    render(this.enchancePanel, this.tabs.enchance);
-    // render(this.enchancePanel, this.tabs.crop);
-    // render(this.enchancePanel, this.tabs.text);
-    // render(this.enchancePanel, this.tabs.edit);
-    // render(this.enchancePanel, this.tabs.stickers);
-  }
+  private createEnhancePanel = (
+    enhanceProps: EnhanceProperties[]
+  ) => {
+    const container = this.tabs.enhance;
+    for(const effect of enhanceProps) {
+      const effectContainer = document.createElement('div');
+      effectContainer.classList.add('enhance-effect-container');
 
-  private enchancePanel = (): JSXElement => {
-    let rangeInput: HTMLInputElement;
-    createEffect(() => {
-      rangeInput = new RangeInput({
-        renderElement: rangeInput,
-        input: {
-          min: '-50',
-          max: '50',
-          step: '1',
-          initialValue: '0',
-          splitPrecent: 50
+      const infoContainer = document.createElement('div');
+      infoContainer.classList.add('effect-container-info');
+      effectContainer.append(infoContainer);
+
+      const title = document.createElement('div');
+      title.classList.add('effect-container-title');
+      title.textContent = effect.filter;
+      infoContainer.append(title);
+
+      const value = document.createElement('div');
+      value.classList.add('effect-container-value');
+      value.textContent = '0';
+      infoContainer.append(value);
+
+
+      const rangeInput = new RangeInput(
+        effect.min,
+        effect.max,
+        '1',
+        '0',
+        effect.splitPrecent
+      );
+
+      rangeInput.input.addEventListener('input', () => {
+        effect.onChange(Number(rangeInput.input.value));
+        value.textContent = rangeInput.input.value;
+        if(rangeInput.input.value != '0') {
+          value.classList.add('active');
+        } else {
+          value.classList.remove('active');
         }
-      }).input;
-
-      rangeInput.addEventListener('input', () => {
-        console.log(rangeInput.value);
       });
-    })
-    return <>
-      <input ref={rangeInput}></input>
-    </>
+
+      effectContainer.append(rangeInput.container);
+
+      container.append(effectContainer);
+    }
   }
 }
 

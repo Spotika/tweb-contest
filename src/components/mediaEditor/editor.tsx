@@ -39,12 +39,10 @@ class Editor {
     this.canvas = document.createElement('canvas');
 
     this.ctx = this.canvas.getContext('2d');
-    this.ctx.filter = 'blur(4px)';
 
     this.itemDiv.append(this.canvas);
     renderElement.replaceWith(this.itemDiv);
 
-    // (async() => {
     createEffect(async() => {
       const img = new Image();
       const url = await apiManagerProxy.invoke('createObjectURL', file);
