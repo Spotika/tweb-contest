@@ -162,19 +162,30 @@ class Editor {
       const iz = (1 - sv)*luB + sv;
 
       for(var i = 0; i < dA.length; i += 4) {
-          const red = dA[i]; // Extract original red color [0 to 255]. Similarly for green and blue below
-          const green = dA[i + 1];
-          const blue = dA[i + 2];
+        const red = dA[i]; // Extract original red color [0 to 255]. Similarly for green and blue below
+        const green = dA[i + 1];
+        const blue = dA[i + 2];
 
-          const saturatedRed = (az*red + bz*green + cz*blue);
-          const saturatedGreen = (dz*red + ez*green + fz*blue);
-          const saturateddBlue = (gz*red + hz*green + iz*blue);
+        const saturatedRed = (az*red + bz*green + cz*blue);
+        const saturatedGreen = (dz*red + ez*green + fz*blue);
+        const saturateddBlue = (gz*red + hz*green + iz*blue);
 
-          dA[i] = saturatedRed;
-          dA[i + 1] = saturatedGreen;
-          dA[i + 2] = saturateddBlue;
+        dA[i] = saturatedRed;
+        dA[i + 1] = saturatedGreen;
+        dA[i + 2] = saturateddBlue;
       }
       ctx.putImageData(imageData, 0, 0);
+    }
+
+    const warmth = () => {
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const d = imgData.data;
+      const value = -this.enhanceValues.Warmth / 5;
+      for(var i = 0; i < d.length; i += 4) {
+        d[i] = Math.min(255, Math.max(0, d[i] - value));
+        d[i+2] = Math.min(255, Math.max(0, d[i] + value));;
+      }
+      ctx.putImageData(imgData, 0, 0);
     }
 
     // apply all effects in specific order
@@ -182,6 +193,7 @@ class Editor {
     contrast();
     brightness();
     saturation();
+    warmth();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
