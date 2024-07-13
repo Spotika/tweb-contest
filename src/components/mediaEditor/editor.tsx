@@ -75,7 +75,9 @@ class Editor {
 
   private doEnhance() {
     const ctx = this.canvas.getContext('2d');
+    ctx.drawImage(this.sourceImage, 0, 0);
 
+    const [width, height] = [this.sourceImage.width, this.sourceImage.height]
     const enhance = () => {
       const enhanceValue = this.enhanceValues.Enhance / 4;
 
@@ -85,7 +87,7 @@ class Editor {
       const saturation = 1 + (enhanceValue / 100); // Increase saturation
 
       // Get image data
-      const imageData = ctx.getImageData(0, 0, this.sourceImage.width, this.sourceImage.height);
+      const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
       // Iterate over each pixel
@@ -123,12 +125,26 @@ class Editor {
 
     const brightness = () => {
       ctx.filter = `brightness(${this.enhanceValues.Brightness + 100}%)`;
-      ctx.drawImage(this.sourceImage, 0, 0);
+      ctx.drawImage(ctx.canvas, 0, 0);
+    }
+
+    const contrast = () => {
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const d = imgData.data;
+      const value = (this.enhanceValues.Contrast/100) + 1;  //convert to decimal & shift range: [0..2]
+      var intercept = 128 * (1 - value);
+      for(var i = 0; i < d.length; i += 4){   //r,g,b,a
+          d[i] = d[i]*value + intercept;
+          d[i+1] = d[i+1]*value + intercept;
+          d[i+2] = d[i+2]*value + intercept;
+      }
+      ctx.putImageData(imgData, 0, 0);
     }
 
     // apply all effects in specific order
-    brightness();
     enhance();
+    contrast();
+    brightness();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
