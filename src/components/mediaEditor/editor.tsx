@@ -131,20 +131,57 @@ class Editor {
     const contrast = () => {
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
-      const value = (this.enhanceValues.Contrast/100) + 1;  //convert to decimal & shift range: [0..2]
+      const value = (this.enhanceValues.Contrast/100) + 1;
       var intercept = 128 * (1 - value);
-      for(var i = 0; i < d.length; i += 4){   //r,g,b,a
-          d[i] = d[i]*value + intercept;
-          d[i+1] = d[i+1]*value + intercept;
-          d[i+2] = d[i+2]*value + intercept;
+      for(var i = 0; i < d.length; i += 4) {
+        d[i] = d[i]*value + intercept;
+        d[i+1] = d[i+1]*value + intercept;
+        d[i+2] = d[i+2]*value + intercept;
       }
       ctx.putImageData(imgData, 0, 0);
+    }
+
+    const saturation = () => {
+      var imageData = ctx.getImageData(0, 0, width, height);
+      const dA = imageData.data; // raw pixel data in array
+
+      const sv = this.enhanceValues.Saturation / 100 + 1; // saturation value. 0 = grayscale, 1 = original
+
+      const luR = 0.3086; // constant to determine luminance of red. Similarly, for green and blue
+      const luG = 0.6094;
+      const luB = 0.0820;
+
+      const az = (1 - sv)*luR + sv;
+      const bz = (1 - sv)*luG;
+      const cz = (1 - sv)*luB;
+      const dz = (1 - sv)*luR;
+      const ez = (1 - sv)*luG + sv;
+      const fz = (1 - sv)*luB;
+      const gz = (1 - sv)*luR;
+      const hz = (1 - sv)*luG;
+      const iz = (1 - sv)*luB + sv;
+
+      for(var i = 0; i < dA.length; i += 4) {
+          const red = dA[i]; // Extract original red color [0 to 255]. Similarly for green and blue below
+          const green = dA[i + 1];
+          const blue = dA[i + 2];
+
+          const saturatedRed = (az*red + bz*green + cz*blue);
+          const saturatedGreen = (dz*red + ez*green + fz*blue);
+          const saturateddBlue = (gz*red + hz*green + iz*blue);
+
+          dA[i] = saturatedRed;
+          dA[i + 1] = saturatedGreen;
+          dA[i + 2] = saturateddBlue;
+      }
+      ctx.putImageData(imageData, 0, 0);
     }
 
     // apply all effects in specific order
     enhance();
     contrast();
     brightness();
+    saturation();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
