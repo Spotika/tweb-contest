@@ -42,7 +42,8 @@ class Editor {
     this.itemDiv.classList.add('editor-container');
     this.canvas = document.createElement('canvas');
 
-    const mainCtx = this.canvas.getContext('2d');
+    const mainCtx = this.canvas.getContext('2d', {willReadFrequently: true});
+    mainCtx.fillStyle = `rgba(255, 255, 255, 0)`;
 
     this.itemDiv.append(this.canvas);
     renderElement.replaceWith(this.itemDiv);
@@ -61,6 +62,8 @@ class Editor {
       for(const filter of EnhanceFilters) {
         this.enhanceValues[filter] = 0;
       }
+      this.doEnhance();
+      this.doEnhance();
     });
   }
 
@@ -74,10 +77,11 @@ class Editor {
   }
 
   private doEnhance() {
-    const ctx = this.canvas.getContext('2d');
+    const ctx = this.canvas.getContext('2d', {willReadFrequently: true});
+    const [width, height] = [this.sourceImage.width, this.sourceImage.height];
     ctx.drawImage(this.sourceImage, 0, 0);
+    // ctx.fillRect(0, 0, width, height);
 
-    const [width, height] = [this.sourceImage.width, this.sourceImage.height]
     const enhance = () => {
       const enhanceValue = this.enhanceValues.Enhance / 4;
 
@@ -183,9 +187,15 @@ class Editor {
       const value = -this.enhanceValues.Warmth / 5;
       for(var i = 0; i < d.length; i += 4) {
         d[i] = Math.min(255, Math.max(0, d[i] - value));
-        d[i+2] = Math.min(255, Math.max(0, d[i] + value));;
+        d[i+2] = Math.min(255, Math.max(0, d[i + 2] + value));
       }
       ctx.putImageData(imgData, 0, 0);
+    }
+
+    const fade = () => {
+      const value = this.enhanceValues.Fade / 300;
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
     }
 
     // apply all effects in specific order
@@ -194,6 +204,7 @@ class Editor {
     brightness();
     saturation();
     warmth();
+    fade();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
