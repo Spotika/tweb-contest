@@ -1,40 +1,125 @@
-import renderImageFromUrl, {renderImageFromUrlPromise} from '../../helpers/dom/renderImageFromUrl';
-import apiManagerProxy from '../../lib/mtproto/mtprotoworker';
-import {JSXElement, createEffect, createSignal} from 'solid-js'
+import {createEffect} from 'solid-js'
 import Icon from '../icon';
 import {ButtonIconTsx} from '../buttonIconTsx';
-import getProxiedManagers from '../../lib/appManagers/getProxiedManagers';
-import Scrollable from '../scrollable';
 import {render} from 'solid-js/web';
-import ripple from '../ripple';
 import {horizontalMenu} from '../horizontalMenu';
 import RangeInput from './editorRangeInput';
+import Editor from './editor';
 
-type EnhanceProperties = {
-  filter: string;
+export const EnhanceFilters = [
+  'Enhance',
+  'Brightness',
+  'Contrast',
+  'Saturation',
+  'Warmth',
+  'Fade',
+  'Highlights',
+  'Shadows',
+  'Vingette',
+  'Grain',
+  'Sharpen'
+] as const;
+
+export type EnhanceProperties = {
+  filter: typeof EnhanceFilters[number];
   min: string;
   max: string;
   splitPrecent: number;
-  onChange: (newValue: number) => void;
+}
+
+export type EnhanceEvent = {
+  type: 'enhance';
+  filter: EnhanceProperties['filter'];
+  value: number;
 }
 
 export type EditorProperties = {
-  [key in Icon]: any;
-} | {
   enhance: EnhanceProperties[];
 };
+
+export type EditEvent = EnhanceEvent;
 
 class Panel {
   private container: HTMLDivElement;
 
+  private properties: EditorProperties = {
+    enhance: [{
+      filter: 'Enhance',
+      min: '0',
+      max: '100',
+      splitPrecent: 0
+    }, {
+      filter: 'Brightness',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Contrast',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Saturation',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Warmth',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Fade',
+      min: '0',
+      max: '100',
+      splitPrecent: 0
+    }, {
+      filter: 'Highlights',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Shadows',
+      min: '-100',
+      max: '100',
+      splitPrecent: 50
+    }, {
+      filter: 'Vingette',
+      min: '0',
+      max: '100',
+      splitPrecent: 0
+    }, {
+      filter: 'Grain',
+      min: '0',
+      max: '100',
+      splitPrecent: 0
+    }, {
+      filter: 'Sharpen',
+      min: '0',
+      max: '100',
+      splitPrecent: 0
+    }]
+  };
+
+
   private selectTab;
   private tabs: {[key in keyof EditorProperties]: HTMLDivElement} = {} as any;
 
+  private eventChain: EditEvent[] = [];
+  private currentState: number = -1; // points to last event element
+  private editorRef: Editor;
+
+  private undoButton: HTMLButtonElement;
+  private redoButton: HTMLButtonElement;
+
+
   constructor(
     renderElement: HTMLElement,
-    properties: EditorProperties,
+    editor: Editor,
     close: () => void
   ) {
+    this.editorRef = editor;
+
     this.container = document.createElement('div');
     this.container.classList.add('editor-panel');
 
@@ -49,8 +134,12 @@ class Panel {
               <div class="title">Edit</div>
             </div>
             <div class="actions">
-              <ButtonIconTsx icon='undo'/>
-              <ButtonIconTsx icon='redo'/>
+              <ButtonIconTsx ref={this.undoButton} icon='undo' onclick={() => {
+                this.undo();
+              }}/>
+              <ButtonIconTsx ref={this.redoButton} icon='redo'onclick={() => {
+                this.redo();
+              }}/>
             </div>
           </div>
           <div ref={tabs}></div>
@@ -64,7 +153,7 @@ class Panel {
     nav.classList.add('editor-panel-tabs', 'menu-horizontal-div');
     const tabsMenu = nav;
 
-    for(const tabName of Object.keys(properties) as Array<keyof typeof properties>) {
+    for(const tabName of Object.keys(this.properties) as Array<keyof typeof this.properties>) {
       const menuTab = document.createElement('div');
       menuTab.classList.add('menu-horizontal-div-item', 'editor-panel-menu-div-item');
       const i = document.createElement('i');
@@ -79,7 +168,7 @@ class Panel {
     const tabsContainer = document.createElement('div');
     tabsContainer.classList.add('editor-panel-tabs-container', 'tabs-container');
 
-    for(const tabName of Object.keys(properties) as Array<keyof typeof properties>) {
+    for(const tabName of Object.keys(this.properties) as Array<keyof typeof this.properties>) {
       const container = document.createElement('div');
       container.classList.add('editor-panel-tab-container', 'editor-panel-container-' + tabName, 'tabs-tab');
 
@@ -98,19 +187,31 @@ class Panel {
     createEffect(() => {
       tabs.replaceWith(tabsMenu);
       tabsContainerRef.replaceWith(tabsContainer);
+      this.updateActions();
     });
 
 
     // Tabs creation
-    this.createEnhancePanel(properties.enhance);
+    this.createEnhanceTab();
     renderElement.replaceWith(this.container);
   }
 
-  private createEnhancePanel = (
-    enhanceProps: EnhanceProperties[]
-  ) => {
+  private saveEvent(e: EditEvent) {
+    // remove forward events
+    while(this.eventChain.length - 1 > this.currentState) {
+      this.eventChain.pop();
+    }
+
+    ++this.currentState;
+    this.eventChain.push(e);
+    this.updateActions();
+  }
+
+  // Tab creation
+  private createEnhanceTab(
+  ) {
     const container = this.tabs.enhance;
-    for(const effect of enhanceProps) {
+    for(const effect of this.properties.enhance) {
       const effectContainer = document.createElement('div');
       effectContainer.classList.add('enhance-effect-container');
 
@@ -136,9 +237,17 @@ class Panel {
         '0',
         effect.splitPrecent
       );
+      rangeInput.input.id = 'range-' + effect.filter;
+
+      let oldValue = '0';
 
       rangeInput.input.addEventListener('input', () => {
-        effect.onChange(Number(rangeInput.input.value));
+        this.editorRef.processEvent({
+          type: 'enhance',
+          filter: effect.filter,
+          value: Number(rangeInput.input.value)
+        });
+
         value.textContent = rangeInput.input.value;
         if(rangeInput.input.value != '0') {
           value.classList.add('active');
@@ -147,10 +256,76 @@ class Panel {
         }
       });
 
+      rangeInput.input.addEventListener('mouseup', () => {
+        if(rangeInput.input.value == oldValue) return;
+        this.saveEvent({
+          type: 'enhance',
+          filter: effect.filter,
+          value: Number(rangeInput.input.value)
+        });
+        oldValue = rangeInput.input.value;
+      });
+
       effectContainer.append(rangeInput.container);
 
       container.append(effectContainer);
     }
+  }
+
+  private updateActions() {
+    this.undoButton.disabled = this.currentState == -1;
+    this.redoButton.disabled = this.currentState == this.eventChain.length - 1;
+  }
+
+  private undo(this: this) {
+    console.log(this.eventChain)
+    if(this.eventChain[this.currentState] == undefined) return;
+
+    const cancelableEvent: EditEvent = this.eventChain[this.currentState];
+    switch(cancelableEvent.type) {
+      case 'enhance':
+        let replaceEvent: EnhanceEvent = {
+          type: 'enhance',
+          filter: cancelableEvent.filter,
+          value: 0
+        }
+
+        for(let i = this.currentState - 1; i >= 0; --i) {
+          const suggestedEvent: EditEvent = this.eventChain[i];
+
+          if(suggestedEvent.type == 'enhance' &&
+             suggestedEvent.filter == cancelableEvent.filter
+          ) {
+            replaceEvent = suggestedEvent;
+            break;
+          }
+        }
+        const inputEvent = new InputEvent('input');
+        const inputToChange: HTMLInputElement = document.getElementById('range-' + replaceEvent.filter) as HTMLInputElement;
+        inputToChange.value = replaceEvent.value.toString();
+        inputToChange.dispatchEvent(inputEvent);
+        break;
+    }
+    --this.currentState;
+    this.updateActions();
+  }
+
+  private redo() {
+    if(this.eventChain[this.currentState + 1] == undefined) return;
+    const event = this.eventChain[this.currentState + 1];
+
+    switch(event.type) {
+      case 'enhance':
+        const inputEvent = new InputEvent('input');
+        const inputToChange: HTMLInputElement = document.getElementById('range-' + event.filter) as HTMLInputElement;
+        inputToChange.value = event.value.toString();
+        inputToChange.dispatchEvent(inputEvent);
+        break;
+    }
+
+    this.editorRef.processEvent(event);
+    ++this.currentState;
+    this.updateActions();
   }
 }
 

@@ -4,17 +4,13 @@ class RangeInput {
   public container: HTMLDivElement
 
   constructor(
-    // input: {
-      min: string,
-      max: string,
-      step: string,
-      initialValue: string,
-      splitPrecent: number
-    // }
+    min: string,
+    max: string,
+    step: string,
+    initialValue: string,
+    splitPrecent: number
   ) {
     this.container = document.createElement('div')
-    // params.renderElement.replaceWith(this.container);
-
     this.container.classList.add('editor-range-container');
     const range = document.createElement('input');
     this.input = range;
