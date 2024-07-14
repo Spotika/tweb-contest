@@ -56,14 +56,16 @@ class Editor {
       // draw image on main canvas
       this.canvas.width = this.sourceImage.width;
       this.canvas.height = this.sourceImage.height;
+      mainCtx.fillRect(0, 0, this.sourceImage.width, this.sourceImage.height);
+      mainCtx.fillStyle = `rgba(255, 255, 255, 0)`;
       mainCtx.drawImage(this.sourceImage, 0, 0);
 
       // creating enhanceCanvases
       for(const filter of EnhanceFilters) {
         this.enhanceValues[filter] = 0;
       }
-      this.doEnhance();
-      this.doEnhance();
+      // this.doEnhance();
+      // this.doEnhance();W
     });
   }
 
@@ -77,11 +79,10 @@ class Editor {
   }
 
   private doEnhance() {
-    console.log("banan");
+    console.log('banan');
     const ctx = this.canvas.getContext('2d', {willReadFrequently: true});
     const [width, height] = [this.sourceImage.width, this.sourceImage.height];
     ctx.drawImage(this.sourceImage, 0, 0);
-    // ctx.fillRect(0, 0, width, height);
 
     const enhance = () => {
       const enhanceValue = this.enhanceValues.Enhance / 4;
@@ -194,9 +195,10 @@ class Editor {
     }
 
     const fade = () => {
+      ctx.rect(0, 0, width, height);
       const value = this.enhanceValues.Fade / 300;
-      ctx.fillRect(0, 0, width, height);
       ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
+      ctx.fill();
     }
 
     const highlightsAndShadows = () => {
@@ -228,14 +230,31 @@ class Editor {
       // you can change 0.05 and 8.0 according to your needs but okay for me
     }
 
+    const vingette = () => {
+      // ctx.clearRect(0, 0, width, height);
+
+      // create radial gradient
+      var outerRadius = width * .6;
+      var innerRadius = width * .05;
+      var grd = ctx.createRadialGradient(width / 2, height / 2, innerRadius, width / 2, height / 2, outerRadius);
+      // light blue
+      grd.addColorStop(0, 'rgba(0,0,0,0)');
+      // dark blue
+      grd.addColorStop(1, 'rgba(0,0,0,' + this.enhanceValues.Vingette / 150 + ')');
+
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+
     // apply all effects in specific order
     enhance();
     contrast();
     brightness();
     saturation();
     warmth();
-    fade();
     highlightsAndShadows();
+    fade();
+    vingette();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
