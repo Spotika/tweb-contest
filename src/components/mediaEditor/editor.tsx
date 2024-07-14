@@ -77,6 +77,7 @@ class Editor {
   }
 
   private doEnhance() {
+    console.log("banan");
     const ctx = this.canvas.getContext('2d', {willReadFrequently: true});
     const [width, height] = [this.sourceImage.width, this.sourceImage.height];
     ctx.drawImage(this.sourceImage, 0, 0);
@@ -198,6 +199,35 @@ class Editor {
       ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
     }
 
+    const highlightsAndShadows = () => {
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const d = imgData.data;
+      const highlights = this.enhanceValues.Highlights / 500;
+      const shadows = -this.enhanceValues.Shadows / 500;
+
+
+      const lumR = 0.00299;
+      const lumG = 0.00587;
+      const lumB = 0.00114;
+      for(var i = 0; i < d.length; i += 4) {
+        const luminance = lumR*d[i] + lumG*d[i+1] + lumB*d[i+2];
+        // console.log(luminance);
+        const h = highlights * (Math.pow(10.0, luminance) - 1.0);
+        const s = shadows * 10 * (Math.pow(10.0, 1.2 - luminance) - 1.0);
+        d[i] += h + s;
+        d[i+1] += h + s;
+        d[i+2] += h + s;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      // we have to find luminance of the pixel
+      // here 0.0 <= source.r/source.g/source.b <= 1.0
+      // and 0.0 <= luminance <= 1.0
+      // here highlights and and shadows are our desired filter amounts
+      // highlights/shadows should be >= -1.0 and <= +1.0
+      // highlights = shadows = 0.0 by default
+      // you can change 0.05 and 8.0 according to your needs but okay for me
+    }
+
     // apply all effects in specific order
     enhance();
     contrast();
@@ -205,6 +235,7 @@ class Editor {
     saturation();
     warmth();
     fade();
+    highlightsAndShadows();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
