@@ -246,6 +246,20 @@ class Editor {
       ctx.fill();
     }
 
+    const grain = () => {
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const d = imgData.data;
+      const amount = this.enhanceValues.Grain / 5;
+
+      for(var i = 0; i < d.length; i += 4) {
+        const grainAmount = (1 - Math.random() * 2) * amount;
+        d[i] += grainAmount;
+        d[i+1] += grainAmount;
+        d[i+2] += grainAmount;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
     // apply all effects in specific order
     enhance();
     contrast();
@@ -255,6 +269,7 @@ class Editor {
     highlightsAndShadows();
     fade();
     vingette();
+    grain();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {

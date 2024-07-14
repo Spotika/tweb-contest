@@ -242,18 +242,17 @@ class Panel {
       let oldValue = '0';
 
       rangeInput.input.addEventListener('input', () => {
-        this.editorRef.processEvent({
-          type: 'enhance',
-          filter: effect.filter,
-          value: Number(rangeInput.input.value)
-        });
-
         value.textContent = rangeInput.input.value;
         if(rangeInput.input.value != '0') {
           value.classList.add('active');
         } else {
           value.classList.remove('active');
         }
+        this.editorRef.processEvent({
+          type: 'enhance',
+          filter: effect.filter,
+          value: Number(rangeInput.input.value)
+        });
       });
 
       rangeInput.input.addEventListener('mouseup', () => {
