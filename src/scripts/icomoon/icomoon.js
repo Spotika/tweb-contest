@@ -146,7 +146,7 @@ async function pipeline(options = {}) {
     await fs.remove(outputDir);
     await fs.ensureDir(outputDir);
 
-    const browser = await puppeteer.launch({headless: !visible});
+    const browser = await puppeteer.launch({headless: 'new'});
     logger('Started a new chrome instance, going to load icomoon.io.');
     const page = await browser.newPage();
     (await browser.target().createCDPSession()).send('Browser.setDownloadBehavior', {

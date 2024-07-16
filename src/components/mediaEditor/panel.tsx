@@ -5,6 +5,7 @@ import {render} from 'solid-js/web';
 import {horizontalMenu} from '../horizontalMenu';
 import RangeInput from './editorRangeInput';
 import Editor from './editor';
+import ripple from '../ripple';
 
 export const EnhanceFilters = [
   'Enhance',
@@ -27,17 +28,28 @@ export type EnhanceProperties = {
   splitPrecent: number;
 }
 
+export type CropProperties = {
+  ratioX: number,
+  ratioY: number
+}
+
 export type EnhanceEvent = {
   type: 'enhance';
   filter: EnhanceProperties['filter'];
   value: number;
 }
 
+export type CropEvent = {
+  type: 'crop',
+  data: string
+}
+
 export type EditorProperties = {
   enhance: EnhanceProperties[];
+  crop: string[];
 };
 
-export type EditEvent = EnhanceEvent;
+export type EditEvent = EnhanceEvent | CropEvent;
 
 class Panel {
   private container: HTMLDivElement;
@@ -98,7 +110,10 @@ class Panel {
       min: '0',
       max: '100',
       splitPrecent: 0
-    }]
+    }],
+    crop: [
+      '3_2', '4_3', '5_4', '7_5', '16_9'
+    ]
   };
 
 
@@ -181,8 +196,14 @@ class Panel {
       this.tabs[tabName as keyof EditorProperties] = content;
     }
 
-    this.selectTab = horizontalMenu(tabsMenu, tabsContainer);
-    this.selectTab(0, false);
+    this.selectTab = horizontalMenu(tabsMenu, tabsContainer, (id: number) => {
+      if(id == 1) {
+        this.editorRef.enableCropMode();
+      } else {
+        this.editorRef.disableCropMode();
+      }
+    });
+    this.selectTab(1, false); // TODO: change to 0 if not debug
 
     createEffect(() => {
       tabs.replaceWith(tabsMenu);
@@ -193,6 +214,7 @@ class Panel {
 
     // Tabs creation
     this.createEnhanceTab();
+    this.createCropTab();
     renderElement.replaceWith(this.container);
   }
 
@@ -208,8 +230,7 @@ class Panel {
   }
 
   // Tab creation
-  private createEnhanceTab(
-  ) {
+  private createEnhanceTab() {
     const container = this.tabs.enhance;
     for(const effect of this.properties.enhance) {
       const effectContainer = document.createElement('div');
@@ -269,6 +290,81 @@ class Panel {
 
       container.append(effectContainer);
     }
+  }
+
+  private createCropTab() {
+    const container = this.tabs.crop;
+
+    const setButtonContext = (buttons: HTMLButtonElement[], onChange: (button: HTMLButtonElement) => void) => {
+      let activeButton = buttons[0];
+      activeButton.classList.add('active');
+
+      for(const button of buttons) {
+        button.addEventListener('click', () => {
+          activeButton.classList.remove('active');
+          activeButton = button;
+          activeButton.classList.add('active');
+          onChange(button);
+        });
+      }
+    };
+
+    const variantButton = (icon_name: Icon | null, text: string, filter: string) => {
+      const button = document.createElement('button');
+      button.id = 'variant-button-' + filter;
+      button.classList.add('variant-button');
+      if(icon_name != null) {
+        const icon = Icon(icon_name);
+        button.append(icon);
+      }
+
+      const textContainer = document.createElement('div');
+      textContainer.textContent = text;
+      button.append(textContainer);
+
+      ripple(button);
+
+      return button;
+    };
+
+    // title
+    const title = document.createElement('div');
+    title.classList.add('crop-title');
+    title.textContent = 'Aspect ratio'; // TODO: do trunslate
+    container.append(title);
+
+    // common buttons
+    const freeBtn = variantButton('data', 'Free', 'free');
+    const originalBtn = variantButton('data', 'Free', 'original');
+    const squareBtn = variantButton('data', 'Free', 'square');
+    container.append(freeBtn, originalBtn, squareBtn);
+
+    const contextButtons: HTMLButtonElement[] = [freeBtn, originalBtn, squareBtn];
+
+    for(const ratio_variant of this.properties.crop) {
+      const variantBtn = variantButton('add', ratio_variant.replace('_', ':'), ratio_variant);
+      const variantBtnMirrored = variantButton('add', ratio_variant.replace('_', ':').split(':').reverse().join(':'), ratio_variant);
+      const variantContainer = document.createElement('div');
+      variantContainer.classList.add('variant-container');
+      variantContainer.append(variantBtn, variantBtnMirrored);
+      contextButtons.push(variantBtn, variantBtnMirrored);
+      container.append(variantContainer);
+    }
+
+    setButtonContext(contextButtons, (button) => {
+      const type = button.id.split('-')[2];
+      this.editorRef.processEvent({
+        type: 'crop',
+        data: type
+      });
+    });
+
+    // on free editor callback
+    this.editorRef.linkCropFreeCallback(() => {
+      const freeButton = document.getElementById('variant-button-free');
+      const event = new InputEvent('click');
+      freeButton.dispatchEvent(event);
+    });
   }
 
   private updateActions() {

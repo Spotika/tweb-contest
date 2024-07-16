@@ -32,6 +32,9 @@ class Editor {
   public itemDiv: HTMLElement;
 
   private sourceImage: HTMLImageElement;
+  private canvasContainer: HTMLDivElement;
+  private cropPanel: HTMLDivElement;
+  private onFreeCallback: () => void;
 
   private enhanceValues: {
     [key in EnhanceEvent['filter']]: number;
@@ -40,12 +43,20 @@ class Editor {
   constructor(file: File, renderElement: HTMLElement) {
     this.itemDiv = document.createElement('div');
     this.itemDiv.classList.add('editor-container');
+
+    this.canvasContainer = document.createElement('div');
+    this.canvasContainer.classList.add('canvas-container');
+
+    this.itemDiv.append(this.canvasContainer);
+
+    this.createCropPanel();
+
     this.canvas = document.createElement('canvas');
 
     const mainCtx = this.canvas.getContext('2d', {willReadFrequently: true});
     mainCtx.fillStyle = `rgba(255, 255, 255, 0)`;
 
-    this.itemDiv.append(this.canvas);
+    this.canvasContainer.append(this.canvas);
     renderElement.replaceWith(this.itemDiv);
 
     createEffect(async() => {
@@ -64,8 +75,6 @@ class Editor {
       for(const filter of EnhanceFilters) {
         this.enhanceValues[filter] = 0;
       }
-      // this.doEnhance();
-      // this.doEnhance();W
     });
   }
 
@@ -75,11 +84,12 @@ class Editor {
         this.enhanceValues[e.filter] = e.value;
         this.doEnhance();
         break;
+      case 'crop':
+        this.doCrop(e.data);
     }
   }
 
   private doEnhance() {
-    console.log('banan');
     const ctx = this.canvas.getContext('2d', {willReadFrequently: true});
     const [width, height] = [this.sourceImage.width, this.sourceImage.height];
     ctx.drawImage(this.sourceImage, 0, 0);
@@ -323,6 +333,10 @@ class Editor {
     sharpen();
   }
 
+  private doCrop(data: string) {
+    // console.log(data);
+  }
+
   public async getModifiedFile(newFileName: string): Promise<File> {
     return fetch(this.canvas.toDataURL())
     .then(res => res.blob())
@@ -330,6 +344,26 @@ class Editor {
       const file = new File([blob], newFileName, blob);
       return file;
     });
+  }
+
+  public linkCropFreeCallback(callback: () => void) {
+    this.onFreeCallback = callback;
+  }
+
+  private createCropPanel() {
+    this.cropPanel = document.createElement('div');
+    this.cropPanel.classList.add('crop-panel');
+    this.itemDiv.append(this.cropPanel);
+  }
+
+  public enableCropMode(): void {
+    this.canvasContainer.classList.add('crop-mode');
+    this.cropPanel.classList.add('active');
+  }
+
+  public disableCropMode(): void {
+    this.canvasContainer.classList.remove('crop-mode');
+    this.cropPanel.classList.remove('active');
   }
 }
 
