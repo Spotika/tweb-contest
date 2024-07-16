@@ -334,16 +334,16 @@ class Panel {
     container.append(title);
 
     // common buttons
-    const freeBtn = variantButton('data', 'Free', 'free');
-    const originalBtn = variantButton('data', 'Free', 'original');
-    const squareBtn = variantButton('data', 'Free', 'square');
+    const freeBtn = variantButton('free', 'Free', 'free');
+    const originalBtn = variantButton('original', 'Original', 'original');
+    const squareBtn = variantButton('square', 'Square', 'square');
     container.append(freeBtn, originalBtn, squareBtn);
 
     const contextButtons: HTMLButtonElement[] = [freeBtn, originalBtn, squareBtn];
 
     for(const ratio_variant of this.properties.crop) {
-      const variantBtn = variantButton('add', ratio_variant.replace('_', ':'), ratio_variant);
-      const variantBtnMirrored = variantButton('add', ratio_variant.replace('_', ':').split(':').reverse().join(':'), ratio_variant);
+      const variantBtn = variantButton('r' + ratio_variant.replace('_', 'x') as Icon, ratio_variant.replace('_', ':'), ratio_variant);
+      const variantBtnMirrored = variantButton('r' + ratio_variant.split('_').reverse().join('x') as Icon, ratio_variant.replace('_', ':').split(':').reverse().join(':'), ratio_variant);
       const variantContainer = document.createElement('div');
       variantContainer.classList.add('variant-container');
       variantContainer.append(variantBtn, variantBtnMirrored);
