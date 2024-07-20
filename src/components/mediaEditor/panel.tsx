@@ -203,7 +203,7 @@ class Panel {
         this.editorRef.disableCropMode();
       }
     });
-    this.selectTab(1, false); // TODO: change to 0 if not debug
+    this.selectTab(0, false); // TODO: change to 0 if not debug
 
     createEffect(() => {
       tabs.replaceWith(tabsMenu);
@@ -301,6 +301,7 @@ class Panel {
 
       for(const button of buttons) {
         button.addEventListener('click', () => {
+          if(activeButton == button) return;
           activeButton.classList.remove('active');
           activeButton = button;
           activeButton.classList.add('active');
@@ -336,14 +337,14 @@ class Panel {
     // common buttons
     const freeBtn = variantButton('free', 'Free', 'free');
     const originalBtn = variantButton('original', 'Original', 'original');
-    const squareBtn = variantButton('square', 'Square', 'square');
+    const squareBtn = variantButton('square', 'Square', '1_1');
     container.append(freeBtn, originalBtn, squareBtn);
 
     const contextButtons: HTMLButtonElement[] = [freeBtn, originalBtn, squareBtn];
 
     for(const ratio_variant of this.properties.crop) {
       const variantBtn = variantButton('r' + ratio_variant.replace('_', 'x') as Icon, ratio_variant.replace('_', ':'), ratio_variant);
-      const variantBtnMirrored = variantButton('r' + ratio_variant.split('_').reverse().join('x') as Icon, ratio_variant.replace('_', ':').split(':').reverse().join(':'), ratio_variant);
+      const variantBtnMirrored = variantButton('r' + ratio_variant.split('_').reverse().join('x') as Icon, ratio_variant.replace('_', ':').split(':').reverse().join(':'), ratio_variant.split('_').reverse().join('_'));
       const variantContainer = document.createElement('div');
       variantContainer.classList.add('variant-container');
       variantContainer.append(variantBtn, variantBtnMirrored);
@@ -373,7 +374,6 @@ class Panel {
   }
 
   private undo(this: this) {
-    console.log(this.eventChain)
     if(this.eventChain[this.currentState] == undefined) return;
 
     const cancelableEvent: EditEvent = this.eventChain[this.currentState];

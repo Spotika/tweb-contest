@@ -22,6 +22,7 @@ const MediaEditor = (
   });
 
   const exitEditor = () => {
+    clearInterval(editor.refreshIntervalId);
     params.parentElement.remove();
   }
 

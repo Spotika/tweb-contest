@@ -2,6 +2,8 @@ import renderImageFromUrl, {renderImageFromUrlPromise} from '../../helpers/dom/r
 import apiManagerProxy from '../../lib/mtproto/mtprotoworker';
 import {createEffect, createSignal} from 'solid-js'
 import {EditEvent, EnhanceEvent, EnhanceFilters} from './panel';
+import Icon from '../icon';
+import windowSize from '../../helpers/windowSize';
 
 // const Editor = (params :{
 //   file: File
@@ -27,18 +29,85 @@ import {EditEvent, EnhanceEvent, EnhanceFilters} from './panel';
 //   </>
 // };
 
+type PropertiesType = {
+  enhance: {
+    canvas?: HTMLCanvasElement;
+    needsRender: boolean,
+    renderTimeout: number,
+    values: {
+      [key in EnhanceEvent['filter']]: number;
+    };
+  },
+  crop: {
+    canvas?: HTMLCanvasElement;
+    panel: HTMLDivElement,
+    activeCorner: null | 'rt' | 'lt' | 'lb' | 'rb' | 'center',
+    mouseDownPos: {
+      x: number;
+      y: number;
+    } | null,
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    realRotation: number;
+    bufferRotation: number;
+    mirror: number;
+    bufferMirror: number;
+    realMirror: number;
+    rotationAnimationInProgress: boolean,
+    mirrorAnimationInProgress: boolean,
+    enabled: boolean,
+    onFreeCallback: () => void,
+    ratio: {
+      type: 'free' | 'original';
+    } | {
+      type: 'custom';
+      x: number;
+      y: number;
+    }
+  }
+};
+
 class Editor {
   public canvas: HTMLCanvasElement;
   public itemDiv: HTMLElement;
+  public refreshIntervalId: ReturnType<typeof setInterval>;
 
   private sourceImage: HTMLImageElement;
   private canvasContainer: HTMLDivElement;
-  private cropPanel: HTMLDivElement;
-  private onFreeCallback: () => void;
+  static imagePadding: number = 16;
 
-  private enhanceValues: {
-    [key in EnhanceEvent['filter']]: number;
-  } = {} as any;
+  private properties: PropertiesType = {
+    enhance: {
+      values: {} as any,
+      renderTimeout: 100,
+      needsRender: false
+    },
+    crop: {
+      panel: document.createElement('div'),
+      activeCorner: null,
+      mouseDownPos: null,
+      onFreeCallback: () => {},
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      rotation: 0,
+      rotationAnimationInProgress: false,
+      mirror: 1,
+      bufferMirror: 0,
+      realMirror: 1,
+      realRotation: 0,
+      bufferRotation: 0,
+      mirrorAnimationInProgress: false,
+      enabled: false,
+      ratio: {
+        type: 'free'
+      }
+    }
+  };
 
   constructor(file: File, renderElement: HTMLElement) {
     this.itemDiv = document.createElement('div');
@@ -49,14 +118,39 @@ class Editor {
 
     this.itemDiv.append(this.canvasContainer);
 
-    this.createCropPanel();
-
     this.canvas = document.createElement('canvas');
-
-    const mainCtx = this.canvas.getContext('2d', {willReadFrequently: true});
-    mainCtx.fillStyle = `rgba(255, 255, 255, 0)`;
-
     this.canvasContainer.append(this.canvas);
+
+    // init pipeline values
+    const createCropPanel = () => {
+      const cropPanel = this.properties.crop.panel;
+      cropPanel.classList.add('crop-panel');
+      this.itemDiv.append(cropPanel);
+
+      const flipIcon = document.createElement('div');
+      flipIcon.append(Icon('cropflip'));
+      flipIcon.classList.add('icon-button');
+      flipIcon.onclick = this.cropFlip.bind(this);
+
+      const rotateIcon = document.createElement('div');
+      rotateIcon.append(Icon('croprotate'));
+      rotateIcon.classList.add('icon-button');
+      rotateIcon.onclick = this.cropRotate.bind(this);
+
+      const degreeScale = document.createElement('div');
+      degreeScale.classList.add('degree-scale');
+
+      cropPanel.append(rotateIcon, degreeScale, flipIcon);
+
+      // degree scale creation
+    }
+    createCropPanel();
+
+    for(const filter of EnhanceFilters) {
+      this.properties.enhance.values[filter] = 0;
+    }
+
+
     renderElement.replaceWith(this.itemDiv);
 
     createEffect(async() => {
@@ -64,38 +158,96 @@ class Editor {
       const url = await apiManagerProxy.invoke('createObjectURL', file);
       await renderImageFromUrlPromise(this.sourceImage, url);
 
-      // draw image on main canvas
+      // set size for result canvas
+      const ctx = this.canvas.getContext('2d');
       this.canvas.width = this.sourceImage.width;
       this.canvas.height = this.sourceImage.height;
-      mainCtx.fillRect(0, 0, this.sourceImage.width, this.sourceImage.height);
-      mainCtx.fillStyle = `rgba(255, 255, 255, 0)`;
-      mainCtx.drawImage(this.sourceImage, 0, 0);
 
-      // creating enhanceCanvases
-      for(const filter of EnhanceFilters) {
-        this.enhanceValues[filter] = 0;
+      // move canvas origin
+      // ctx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
+
+      // init all pipeline canvases and other props
+      for(const layer of Object.keys(this.properties) as Array<keyof PropertiesType>) {
+        const canvas = this.properties[layer].canvas = document.createElement('canvas');
+        canvas.width = this.canvas.width;
+        canvas.height = this.canvas.height;
+
+        // const ctx = canvas.getContext('2d');
+        // ctx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
       }
+
+      this.properties.crop.width = this.sourceImage.width;
+      this.properties.crop.height= this.sourceImage.height;
+
+      // set timeout limitation for redrawing
+      this.refreshIntervalId = setInterval((() => {
+        if(this.properties.enhance.needsRender) {
+          this.doEnhance();
+          this.properties.enhance.needsRender = false;
+        }
+      }).bind(this), this.properties.enhance.renderTimeout);
+
+      this.doEnhance();
+      this.enableCropMode();
+      this.disableCropMode();
     });
   }
 
   public processEvent(e: EditEvent) {
     switch(e.type) {
       case 'enhance':
-        this.enhanceValues[e.filter] = e.value;
-        this.doEnhance();
+        this.properties.enhance.values[e.filter] = e.value;
+        this.properties.enhance.needsRender = true;
         break;
       case 'crop':
-        this.doCrop(e.data);
+        if(e.data == 'original' || e.data == 'free') {
+          this.properties.crop.ratio.type = e.data;
+        } else {
+          const [stringX, stringY] = e.data.split('_');
+          const [x, y] = [parseInt(stringX), parseInt(stringY)];
+          this.properties.crop.ratio = {
+            type: 'custom',
+            x,
+            y
+          };
+        }
+        this.processCropEvent();
     }
   }
 
+  private processCropEvent() {
+    const props = this.properties.crop;
+    if(props.ratio.type == 'original') {
+      this.properties.crop.x = 0;
+      this.properties.crop.y = 0;
+      this.properties.crop.width = this.canvas.width - 2 * Editor.imagePadding;
+      this.properties.crop.height = this.canvas.height - 2 * Editor.imagePadding;
+    } else if(props.ratio.type == 'custom') {
+      props.x = 0;
+      props.y = 0
+      if(props.ratio.x / props.ratio.y <= this.sourceImage.width / this.sourceImage.height) {
+        props.width = Math.floor(props.ratio.x / props.ratio.y * this.sourceImage.height);
+        props.height = this.sourceImage.height;
+      } else {
+        props.height = Math.floor(props.ratio.y / props.ratio.x * this.sourceImage.width);
+        props.width = this.sourceImage.width;
+      }
+    }
+
+    this.doCrop();
+    this.doCrop();
+  }
+
+  // pipeline functions (in their order)
   private doEnhance() {
-    const ctx = this.canvas.getContext('2d', {willReadFrequently: true});
+    const ctx = this.properties.enhance.canvas.getContext('2d', {willReadFrequently: true});
     const [width, height] = [this.sourceImage.width, this.sourceImage.height];
     ctx.drawImage(this.sourceImage, 0, 0);
 
+    const values = this.properties.enhance.values;
+
     const enhance = () => {
-      const enhanceValue = this.enhanceValues.Enhance / 4;
+      const enhanceValue = values.Enhance / 4;
 
       // Calculate the adjustment factors
       const contrast = 1 + (enhanceValue / 100); // Increase contrast
@@ -140,14 +292,13 @@ class Editor {
     }
 
     const brightness = () => {
-      ctx.filter = `brightness(${this.enhanceValues.Brightness + 100}%)`;
-      ctx.drawImage(ctx.canvas, 0, 0);
+      ctx.filter = `brightness(${values.Brightness + 100}%)`;
     }
 
     const contrast = () => {
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
-      const value = (this.enhanceValues.Contrast/100) + 1;
+      const value = (values.Contrast/100) + 1;
       var intercept = 128 * (1 - value);
       for(var i = 0; i < d.length; i += 4) {
         d[i] = d[i]*value + intercept;
@@ -158,10 +309,10 @@ class Editor {
     }
 
     const saturation = () => {
-      var imageData = ctx.getImageData(0, 0, width, height);
+      const imageData = ctx.getImageData(0, 0, width, height);
       const dA = imageData.data; // raw pixel data in array
 
-      const sv = this.enhanceValues.Saturation / 100 + 1; // saturation value. 0 = grayscale, 1 = original
+      const sv = values.Saturation / 100 + 1; // saturation value. 0 = grayscale, 1 = original
 
       const luR = 0.3086; // constant to determine luminance of red. Similarly, for green and blue
       const luG = 0.6094;
@@ -196,7 +347,7 @@ class Editor {
     const warmth = () => {
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
-      const value = -this.enhanceValues.Warmth / 5;
+      const value = -values.Warmth / 5;
       for(var i = 0; i < d.length; i += 4) {
         d[i] = Math.min(255, Math.max(0, d[i] - value));
         d[i+2] = Math.min(255, Math.max(0, d[i + 2] + value));
@@ -206,7 +357,7 @@ class Editor {
 
     const fade = () => {
       ctx.rect(0, 0, width, height);
-      const value = this.enhanceValues.Fade / 300;
+      const value = values.Fade / 300;
       ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
       ctx.fill();
     }
@@ -214,8 +365,8 @@ class Editor {
     const highlightsAndShadows = () => {
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
-      const highlights = this.enhanceValues.Highlights / 500;
-      const shadows = -this.enhanceValues.Shadows / 500;
+      const highlights = values.Highlights / 500;
+      const shadows = -values.Shadows / 500;
 
 
       const lumR = 0.00299;
@@ -231,26 +382,16 @@ class Editor {
         d[i+2] += h + s;
       }
       ctx.putImageData(imgData, 0, 0);
-      // we have to find luminance of the pixel
-      // here 0.0 <= source.r/source.g/source.b <= 1.0
-      // and 0.0 <= luminance <= 1.0
-      // here highlights and and shadows are our desired filter amounts
-      // highlights/shadows should be >= -1.0 and <= +1.0
-      // highlights = shadows = 0.0 by default
-      // you can change 0.05 and 8.0 according to your needs but okay for me
     }
 
     const vingette = () => {
-      // ctx.clearRect(0, 0, width, height);
-
-      // create radial gradient
       var outerRadius = width * .6;
       var innerRadius = width * .05;
       var grd = ctx.createRadialGradient(width / 2, height / 2, innerRadius, width / 2, height / 2, outerRadius);
       // light blue
       grd.addColorStop(0, 'rgba(0,0,0,0)');
       // dark blue
-      grd.addColorStop(1, 'rgba(0,0,0,' + this.enhanceValues.Vingette / 150 + ')');
+      grd.addColorStop(1, 'rgba(0,0,0,' + values.Vingette / 150 + ')');
 
       ctx.fillStyle = grd;
       ctx.fill();
@@ -259,7 +400,7 @@ class Editor {
     const grain = () => {
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
-      const amount = this.enhanceValues.Grain / 5;
+      const amount = values.Grain / 5;
 
       for(var i = 0; i < d.length; i += 4) {
         const grainAmount = (1 - Math.random() * 2) * amount;
@@ -273,7 +414,7 @@ class Editor {
     const sharpen = () => {
       const h = height;
       const w = width;
-      const mix = this.enhanceValues.Sharpen / 50;
+      const mix = values.Sharpen / 50;
       var x, sx, sy, r, g, b, a, dstOff, srcOff, wt, cx, cy, scy, scx,
         weights = [0, -1, 0, -1, 5, -1, 0, -1, 0],
         katet = Math.round(Math.sqrt(weights.length)),
@@ -329,15 +470,57 @@ class Editor {
     highlightsAndShadows();
     fade();
     vingette();
-    grain();
     sharpen();
+    grain();
+
+    // next pipeline state
+    this.doCrop();
   }
 
-  private doCrop(data: string) {
-    // console.log(data);
+  private doCrop() {
+    // final pipeline state
+    const mainCtx = this.canvas.getContext('2d');
+    const ctx = this.properties.crop.canvas.getContext('2d');
+
+    // clear main and crop canvases
+    mainCtx.save();
+    mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+    mainCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    mainCtx.restore();
+
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, -Editor.imagePadding, -Editor.imagePadding);
+    ctx.clearRect(0, 0, ctx.canvas.width * 2, ctx.canvas.height * 2);
+    ctx.clearRect(0, 0, ctx.canvas.width * 2, ctx.canvas.height * 2);
+    ctx.restore();
+
+    const rotationCanvas = document.createElement('canvas');
+    rotationCanvas.width = ctx.canvas.width;
+    rotationCanvas.height = ctx.canvas.height;
+    const rotationCtx = rotationCanvas.getContext('2d');
+    const props = this.properties.crop;
+
+    const xAX = Math.cos(props.rotation);
+    const xAY = Math.sin(props.rotation);
+    rotationCtx.setTransform(xAX * props.mirror, xAY * props.mirror, -xAY, xAX, this.properties.crop.canvas.width / 2 - Editor.imagePadding, this.properties.crop.canvas.height / 2 - Editor.imagePadding);
+    rotationCtx.drawImage(this.properties.enhance.canvas, -this.properties.enhance.canvas.width / 2, -this.properties.enhance.canvas.height / 2);
+
+
+    if(this.properties.crop.enabled) {
+      ctx.drawImage(rotationCanvas, 0, 0);
+      this.drawCropInterface();
+    } else {
+      ctx.drawImage(rotationCanvas, 0, 0);
+    }
+
+    mainCtx.drawImage(ctx.canvas, -Editor.imagePadding, -Editor.imagePadding);
+
+    rotationCanvas.remove();
   }
 
   public async getModifiedFile(newFileName: string): Promise<File> {
+    this.disableCropMode();
+
     return fetch(this.canvas.toDataURL())
     .then(res => res.blob())
     .then(blob => {
@@ -347,23 +530,425 @@ class Editor {
   }
 
   public linkCropFreeCallback(callback: () => void) {
-    this.onFreeCallback = callback;
+    this.properties.crop.onFreeCallback = callback;
   }
 
-  private createCropPanel() {
-    this.cropPanel = document.createElement('div');
-    this.cropPanel.classList.add('crop-panel');
-    this.itemDiv.append(this.cropPanel);
+  private drawCropInterface() {
+    const props = this.properties.crop;
+
+    const ctx = props.canvas.getContext('2d');
+
+    let [cropX, cropY, cropWidth, cropHeight] = [props.x, props.y, props.width, props.height];
+
+    if(cropWidth < 0) {
+      cropWidth = -cropWidth;
+      cropX -= cropWidth;
+    }
+    if(cropHeight < 0) {
+      cropHeight = -cropHeight;
+      cropY -= cropHeight;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const k = this.canvas.width / rect.width;
+
+    const drawPoint = (x: number, y: number) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 4 * Math.sqrt(k), 0, Math.PI * 2);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+    }
+
+    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.closePath();
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.stroke();
+    }
+    // draw points and lines
+
+    // draw dimmed rects
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, props.canvas.width, cropY);
+    ctx.fillRect(0, cropY + cropHeight, props.canvas.width, props.canvas.height);
+    ctx.fillRect(0, cropY, cropX, cropHeight);
+    ctx.fillRect(cropX + cropWidth, cropY, props.canvas.width - cropX - cropWidth, cropHeight);
+
+    ctx.fill();
+
+    const dh = cropHeight / 3;
+    const dw = cropWidth / 3;
+    drawLine(cropX, cropY, cropX + cropWidth, cropY);
+    drawLine(cropX + 1, cropY + dh, cropX + cropWidth - 1, cropY + dh);
+    drawLine(cropX + 1, cropY + dh * 2, cropX + cropWidth - 1, cropY + dh * 2);
+
+    drawLine(cropX, cropY, cropX, cropY + cropHeight);
+    drawLine(cropX + dw, cropY + 1, cropX + dw, cropY + cropHeight - 1);
+    drawLine(cropX + dw * 2, cropY + 1, cropX + dw * 2, cropY + cropHeight - 1);
+
+
+    drawLine(cropX + cropWidth, cropY, cropX + cropWidth, cropY + cropHeight);
+    drawLine(cropX, cropY + cropHeight, cropX + cropWidth, cropY + cropHeight);
+
+    drawPoint(cropX, cropY);
+    drawPoint(cropX + cropWidth, cropY);
+    drawPoint(cropX, cropY + cropHeight);
+    drawPoint(cropX + cropWidth, cropY + cropHeight);
+  }
+
+  private cropCanvasMouseMove(e: MouseEvent) {
+    const props = this.properties.crop;
+
+    if(props.activeCorner == null) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const relX = e.clientX - rect.left, relY =  e.clientY - rect.top;
+    let x = Math.floor(relX * this.canvas.width / rect.width - Editor.imagePadding);
+    let y = Math.floor(relY * this.canvas.height / rect.height - Editor.imagePadding);
+
+    x = Math.max(0, Math.min(x, this.canvas.width - 2 * Editor.imagePadding));
+    y = Math.max(0, Math.min(y, this.canvas.height - 2 * Editor.imagePadding));
+
+    let [newX, newY, newWidth, newHeight] = [props.x, props.y, props.width, props.height];
+
+    if(props.activeCorner != 'center' && props.ratio.type == 'original') {
+      props.onFreeCallback();
+    }
+
+    if(props.activeCorner == 'lb') {
+      newWidth = props.width + props.x - x;
+      newHeight = y - props.y;
+      if(props.ratio.type == 'custom') {
+        if(props.ratio.x / props.ratio.y <= newWidth / newHeight) {
+          newWidth = Math.floor(props.ratio.x / props.ratio.y * newHeight);
+        } else {
+          newHeight = Math.floor(props.ratio.y / props.ratio.x * newWidth);
+        }
+      }
+      newX = props.width + props.x - newWidth;
+    } else if(props.activeCorner == 'lt') {
+      newWidth = props.width - x + props.x;
+      newHeight = props.height - y + props.y;
+
+      if(props.ratio.type == 'custom') {
+        if(props.ratio.x / props.ratio.y <= newWidth / newHeight) {
+          newWidth = Math.floor(props.ratio.x / props.ratio.y * newHeight);
+        } else {
+          newHeight = Math.floor(props.ratio.y / props.ratio.x * newWidth);
+        }
+      }
+
+      newX = props.width + props.x - newWidth;
+      newY = props.height + props.y - newHeight;
+    } else if(props.activeCorner == 'rb') {
+      newWidth = x - props.x;
+      newHeight = y - props.y;
+
+      if(props.ratio.type == 'custom') {
+        if(props.ratio.x / props.ratio.y <= newWidth / newHeight) {
+          newWidth = Math.floor(props.ratio.x / props.ratio.y * newHeight);
+        } else {
+          newHeight = Math.floor(props.ratio.y / props.ratio.x * newWidth);
+        }
+      }
+    } else if(props.activeCorner == 'rt') {
+      newY = y;
+      newWidth = x - props.x;
+      newHeight -= y - props.y;
+
+      newWidth = x - props.x;
+      newHeight = props.height + props.y - y;
+      if(props.ratio.type == 'custom') {
+        if(props.ratio.x / props.ratio.y <= newWidth / newHeight) {
+          newWidth = Math.floor(props.ratio.x / props.ratio.y * newHeight);
+        } else {
+          newHeight = Math.floor(props.ratio.y / props.ratio.x * newWidth);
+        }
+      }
+      newY = props.height + props.y - newHeight;
+    } else if(props.activeCorner == 'center') {
+      if(props.mouseDownPos == null) {
+        return;
+      }
+      const dx = x - props.mouseDownPos.x;
+      const dy = y - props.mouseDownPos.y;
+      newX += dx;
+      newY += dy;
+      newX = Math.max(0, Math.min(newX, this.canvas.width - Editor.imagePadding));
+      newY = Math.max(0, Math.min(newY, this.canvas.height - Editor.imagePadding));
+
+      if(newX + newWidth > this.canvas.width - 2 * Editor.imagePadding) {
+        newX = this.canvas.width - 2 * Editor.imagePadding - newWidth;
+      }
+      if(newY + newHeight > this.canvas.height - 2 * Editor.imagePadding) {
+        newY = this.canvas.height - 2 * Editor.imagePadding - newHeight;
+      }
+
+      if(newX + newWidth < 0) {
+        newX = -newWidth;
+      }
+      if(newY + newHeight < 0) {
+        newY = -newHeight;
+      }
+
+      props.mouseDownPos = {x: x, y: y};
+    }
+
+    if(newX + newWidth > this.canvas.width - 2 * Editor.imagePadding) {
+      newWidth = this.canvas.width - 2 * Editor.imagePadding - newX;
+    }
+    if(newY + newHeight > this.canvas.height - 2 * Editor.imagePadding) {
+      newHeight = this.canvas.height - 2 * Editor.imagePadding - newY;
+    }
+
+
+    // if(newWidth <= 1) {
+    //   newWidth = 1;
+    //   const translate = {
+    //     rt: 'lt',
+    //     lt: 'rt',
+    //     lb: 'rb',
+    //     rb: 'lb',
+    //     center: 'center'
+    //   } as const;
+
+    //   props.activeCorner = translate[props.activeCorner];
+    // }
+
+    // if(newHeight < 0) {
+    //   newHeight = 1;
+    //   const translate = {
+    //     rt: 'rb',
+    //     rb: 'rt',
+    //     lt: 'lb',
+    //     lb: 'lt',
+    //     center: 'center'
+    //   } as const;
+
+    //   // switch(props.activeCorner) {
+    //   //   case 'rt':
+    //   //     props.activeCorner = 'rb';
+    //   //     newY += newHeight;
+    //   //     break;
+    //   //   case 'rb':
+    //   //     break;
+    //   //   case 'lt':
+    //   //     break;
+    //   //   case 'lb':
+    //   //     break;
+    //   // }
+    //   props.activeCorner = translate[props.activeCorner];
+    // }
+
+    // console.log(newWidth, newHeight, newX, newY);
+
+    props.width = newWidth;
+    props.height = newHeight;
+    props.x = newX;
+    props.y = newY;
+
+    this.doCrop();
+  }
+
+  private cropCanvasMouseDown(e: MouseEvent) {
+    const props = this.properties.crop;
+    const intersectRadius = 12;
+    if(props.activeCorner != null) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const relX = e.clientX - rect.left, relY =  e.clientY - rect.top;
+    const x = relX * this.canvas.width / rect.width - Editor.imagePadding;
+    const y = relY * this.canvas.height / rect.height - Editor.imagePadding;
+
+    const intersect = (x1: number, y1: number) => {
+      if(((x1 - x) ** 2 + (y1 - y) ** 2) < intersectRadius ** 2) {
+        return true;
+      }
+      return false;
+    }
+
+    if(intersect(props.x, props.y)) {
+      props.activeCorner = 'lt';
+    } else if(intersect(props.x + props.width, props.y)) {
+      props.activeCorner = 'rt';
+    } else if(intersect(props.x, props.y + props.height)) {
+      props.activeCorner = 'lb';
+    } else if(intersect(props.x + props.width, props.y + props.height)) {
+      props.activeCorner = 'rb';
+    }
+
+    // center
+    if(
+      (x > props.x + 5 && x < props.x + props.width - 5 && y > props.y + 5 && y < props.y + props.height - 5) ||
+      (x < props.x - 5 && x > props.x + props.width + 5 && y < props.y + 5 && y > props.y + props.height - 5)
+    ) {
+      props.activeCorner = 'center';
+      props.mouseDownPos = {
+        x: Math.floor(x),
+        y: Math.floor(y)
+      };
+    }
+  }
+
+  private cropCanvasMouseUp(e: Event) {
+    const props = this.properties.crop;
+    props.activeCorner = null;
+  }
+
+  private cropRotateBuffer() {
+    let prevTimeStamp: number = undefined
+    const props = this.properties.crop;
+    props.rotationAnimationInProgress = true;
+
+    const animate = (timeStamp: number) => {
+      if(prevTimeStamp === undefined) {
+        prevTimeStamp = timeStamp;
+      }
+
+      const elapsed = timeStamp - prevTimeStamp;
+      if(elapsed === 0) {
+        return window.requestAnimationFrame(animate);
+      }
+
+      if(Math.abs(props.bufferRotation) < 0.005) {
+        props.rotation = props.realRotation;
+        props.bufferRotation = 0;
+        props.rotationAnimationInProgress = false;
+        this.properties.crop.ratio.type = 'original';
+        this.processCropEvent();
+        this.enableCropMode();
+        this.doCrop();
+        return;
+      }
+
+      const dr = Math.min(props.bufferRotation, props.bufferRotation * elapsed * 0.01);
+      props.bufferRotation -= dr;
+      props.rotation += dr;
+      this.enableCropMode();
+      this.properties.crop.ratio.type = 'original';
+      this.processCropEvent();
+
+      prevTimeStamp = timeStamp;
+      this.doCrop();
+      return window.requestAnimationFrame(animate);
+    }
+    window.requestAnimationFrame(animate);
+  }
+
+  private cropRotate() {
+    const props = this.properties.crop;
+    const rotation = Math.PI / 2;
+    props.bufferRotation += rotation;
+    props.realRotation += rotation;
+    if(!props.rotationAnimationInProgress) {
+      this.cropRotateBuffer();
+    }
   }
 
   public enableCropMode(): void {
+    const props = this.properties.crop;
+    props.enabled = true;
     this.canvasContainer.classList.add('crop-mode');
-    this.cropPanel.classList.add('active');
+    props.panel.classList.add('active');
+
+    const sin = Math.abs(Math.sin(props.rotation));
+    const cos = Math.abs(Math.cos(props.rotation));
+
+    this.canvas.width = this.sourceImage.width * cos + this.sourceImage.height * sin + 2 * Editor.imagePadding;
+    this.canvas.height = this.sourceImage.width * sin + this.sourceImage.height * cos + 2 * Editor.imagePadding;
+
+    props.canvas.width = this.canvas.width;
+    props.canvas.height = this.canvas.height;
+
+    const ctx = this.canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
+
+    const cropCtx = props.canvas.getContext('2d');
+    cropCtx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
+
+    // add event listeners
+    this.canvas.onmousedown = this.cropCanvasMouseDown.bind(this);
+    this.canvasContainer.onmouseup = this.cropCanvasMouseUp.bind(this);
+    this.canvasContainer.onmousemove = this.cropCanvasMouseMove.bind(this);
+    this.doCrop();
+  }
+
+  public cropFlip() {
+    this.properties.crop.bufferMirror += -2 * this.properties.crop.realMirror;
+    this.properties.crop.realMirror = -this.properties.crop.realMirror;
+
+    let prevTimeStamp: number;
+
+    const animate = (timeStamp: number) => {
+      if(prevTimeStamp === undefined) {
+        prevTimeStamp = timeStamp;
+        return window.requestAnimationFrame(animate);
+      }
+
+      const elapsed = timeStamp - prevTimeStamp;
+      if(elapsed == 0) {
+        return window.requestAnimationFrame(animate);
+      }
+
+      if(Math.abs(this.properties.crop.bufferMirror) < 0.01) {
+        this.properties.crop.bufferMirror = 0;
+        this.properties.crop.mirrorAnimationInProgress = false;
+        this.properties.crop.mirror = this.properties.crop.realMirror;
+        this.doCrop();
+        return;
+      }
+      const dm = this.properties.crop.bufferMirror / 4 * elapsed * 0.01;
+      this.properties.crop.mirror += dm;
+      this.properties.crop.bufferMirror -= dm;
+
+      requestAnimationFrame(animate);
+      this.doCrop();
+    }
+
+    if(!this.properties.crop.mirrorAnimationInProgress) {
+      window.requestAnimationFrame(animate);
+    }
+
+    this.doCrop();
   }
 
   public disableCropMode(): void {
+    const props = this.properties.crop;
+    props.enabled = false;
     this.canvasContainer.classList.remove('crop-mode');
-    this.cropPanel.classList.remove('active');
+    props.panel.classList.remove('active');
+    if(this.properties.crop.canvas === undefined) {
+      return;
+    }
+    this.canvas.onmousedown = null;
+    this.canvasContainer.onmouseup = null;
+    this.canvasContainer.onmousedown = null;
+    const ctx = this.canvas.getContext('2d');
+
+    let [cropX, cropY, cropWidth, cropHeight] = [props.x, props.y, props.width, props.height];
+
+    if(cropWidth < 0) {
+      cropWidth = -cropWidth;
+      cropX -= cropWidth;
+    }
+    if(cropHeight < 0) {
+      cropHeight = -cropHeight;
+      cropY -= cropHeight;
+    }
+
+    this.canvas.width = cropWidth;
+    this.canvas.height = cropHeight;
+    ctx.setTransform(1, 0, 0, 1, -cropX, -cropY);
+
+    this.doCrop();
   }
 }
 
