@@ -134,6 +134,7 @@ class Panel {
     close: () => void
   ) {
     this.editorRef = editor;
+    this.editorRef.setSaveEvent(this.saveEvent.bind(this));
 
     this.container = document.createElement('div');
     this.container.classList.add('editor-panel');

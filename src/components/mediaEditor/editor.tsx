@@ -54,7 +54,10 @@ type PropertiesType = {
     realRotation: number;
     bufferRotation: number;
     mirror: number;
+    degreeMarksContainer: HTMLDivElement | null;
     bufferMirror: number;
+    panelElements: HTMLElement[];
+    panelRotationTicks: number;
     realMirror: number;
     rotationAnimationInProgress: boolean,
     mirrorAnimationInProgress: boolean,
@@ -77,6 +80,7 @@ class Editor {
 
   private sourceImage: HTMLImageElement;
   private canvasContainer: HTMLDivElement;
+  private saveEvent: (event: EditEvent) => void;
   static imagePadding: number = 16;
 
   private properties: PropertiesType = {
@@ -96,6 +100,9 @@ class Editor {
       height: 0,
       rotation: 0,
       rotationAnimationInProgress: false,
+      panelElements: [],
+      degreeMarksContainer: null,
+      panelRotationTicks: 0,
       mirror: 1,
       bufferMirror: 0,
       realMirror: 1,
@@ -137,14 +144,117 @@ class Editor {
       rotateIcon.classList.add('icon-button');
       rotateIcon.onclick = this.cropRotate.bind(this);
 
-      const degreeScale = document.createElement('div');
-      degreeScale.classList.add('degree-scale');
-
-      cropPanel.append(rotateIcon, degreeScale, flipIcon);
 
       // degree scale creation
+      const degreeScale = document.createElement('div');
+      degreeScale.classList.add('degree-scale');
+      cropPanel.append(rotateIcon, degreeScale, flipIcon);
+
+      degreeScale.addEventListener('wheel', (e: WheelEvent) => {
+        const sign = Math.sign(e.deltaY);
+        this.rotateCropPanel(sign);
+      });
+
+      const cursorIcon = Icon('cursor');
+      const cursor = document.createElement('div');
+      cursor.classList.add('cursor');
+      cursor.append(cursorIcon);
+      degreeScale.append(cursor);
+
+      const degreeMarksContainer = document.createElement('div');
+      this.properties.crop.degreeMarksContainer = degreeMarksContainer;
+      degreeMarksContainer.classList.add('degree-marks-container');
+      degreeScale.append(degreeMarksContainer);
+
+      const marksCount = 12;
+      const marksStep = 6;
+      const markGap = 4;
+
+      const mainMarksList: HTMLElement[] = [];
+      const subMarksList = []
+
+      for(let i = -marksCount; i < marksCount + 1; i++) {
+        const markContainer = document.createElement('div');
+        markContainer.classList.add('degree-mark-container');
+
+        const mark = document.createElement('div');
+        mark.classList.add('degree-mark');
+        markContainer.append(mark);
+        degreeMarksContainer.append(markContainer);
+        this.properties.crop.panelElements.push(markContainer);
+        markContainer.style.left = `${i * (2 * marksStep + markGap * (marksStep + 1)) + i * 2 - 1}px`;
+        mainMarksList.push(markContainer);
+
+        if(i == marksCount) {
+          continue;
+        }
+
+        // submarks
+        for(let j = 0; j < marksStep; j++) {
+          const subMarkContainer = document.createElement('div');
+          subMarkContainer.classList.add('degree-mark-container');
+
+          const submark = document.createElement('div');
+          submark.classList.add('degree-mark');
+          subMarkContainer.append(submark);
+          degreeMarksContainer.append(subMarkContainer);
+          this.properties.crop.panelElements.push(subMarkContainer);
+          const markContainerLeft = i * (2 * marksStep + markGap * (marksStep + 1)) + i * 2 - 1;
+          subMarkContainer.style.left = `${markContainerLeft + (j + 1) * markGap + (j + 1) * 2}px`;
+          submark.style.backgroundColor = 'grey';
+          subMarksList.push(subMarkContainer);
+        }
+      }
+
+
+      function getTextWidth(input: string): number {
+        const text = document.createElement('span');
+        document.body.appendChild(text);
+
+        text.style.fontSize = 12 + 'px';
+        text.style.height = 'auto';
+        text.style.width = 'auto';
+        text.style.position = 'absolute';
+        text.style.whiteSpace = 'no-wrap';
+        text.style.fontWeight = '500';
+        text.innerHTML = input;
+
+        const width = Math.ceil(text.clientWidth);
+        const formattedWidth = width;
+
+        document.body.removeChild(text);
+        return formattedWidth;
+      }
+
+      const minusWidth = getTextWidth('-');
+
+      // numbers
+      for(let i = 0; i < mainMarksList.length; ++i) {
+        const degreeNumberContainer = document.createElement('div');
+        degreeNumberContainer.classList.add('degree-number-container');
+
+        const degreeNumber = document.createElement('div');
+        degreeNumber.classList.add('degree-number');
+        degreeNumber.textContent = `${15 * (i - marksCount)}°`;
+
+        degreeNumberContainer.append(degreeNumber);
+        degreeMarksContainer.append(degreeNumberContainer);
+
+        this.properties.crop.panelElements.push(degreeNumberContainer);
+
+        let textContentToCalc = degreeNumber.textContent.slice(0, -1);
+        let additionalWidth = 0;
+        if(textContentToCalc[0] == '-') {
+          textContentToCalc = textContentToCalc.slice(1);
+          additionalWidth = minusWidth;
+        }
+        const textWidth = getTextWidth(textContentToCalc);
+
+        degreeNumberContainer.style.left = `${parseInt(mainMarksList[i].style.left.slice(0, -2)) - textWidth / 2 - additionalWidth}px`;
+      }
     }
     createCropPanel();
+    this.updateCropPanel();
 
     for(const filter of EnhanceFilters) {
       this.properties.enhance.values[filter] = 0;
@@ -163,17 +273,11 @@ class Editor {
       this.canvas.width = this.sourceImage.width;
       this.canvas.height = this.sourceImage.height;
 
-      // move canvas origin
-      // ctx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
-
       // init all pipeline canvases and other props
       for(const layer of Object.keys(this.properties) as Array<keyof PropertiesType>) {
         const canvas = this.properties[layer].canvas = document.createElement('canvas');
         canvas.width = this.canvas.width;
         canvas.height = this.canvas.height;
-
-        // const ctx = canvas.getContext('2d');
-        // ctx.setTransform(1, 0, 0, 1, Editor.imagePadding, Editor.imagePadding);
       }
 
       this.properties.crop.width = this.sourceImage.width;
@@ -191,6 +295,53 @@ class Editor {
       this.enableCropMode();
       this.disableCropMode();
     });
+  }
+
+  public setSaveEvent(saveEvent: (e: EditEvent) => void) {
+    this.saveEvent = saveEvent;
+  }
+
+  private rotateCropPanel(ticks: number) {
+    const props = this.properties.crop;
+    const oldTicks = props.panelRotationTicks;
+
+    props.panelRotationTicks += ticks;
+    props.panelRotationTicks = Math.max(-84, Math.min(84, props.panelRotationTicks));
+
+    if(oldTicks == props.panelRotationTicks) {
+      return;
+    }
+
+    const rotation = Math.PI / 84 * ticks;
+    props.bufferRotation += rotation;
+    props.realRotation += rotation;
+    if(!props.rotationAnimationInProgress) {
+      this.cropRotateBuffer();
+    }
+    this.updateCropPanel();
+  }
+
+  private updateCropPanel() {
+    const props = this.properties.crop;
+
+    props.degreeMarksContainer.style.left = `${props.panelRotationTicks * 6}px`;
+
+    for(const element of props.panelElements) {
+      const left = parseInt(element.style.left.slice(0, -2)) + 6 * props.panelRotationTicks + 1;
+
+      const opacity = Math.max(0, (1 - Math.abs(left / 200)));
+      element.style.opacity = `${opacity}`;
+
+
+      // increase font size for cursor element
+
+      if(element.classList.contains('degree-number-container')) {
+        // if(Math.abs(left) < 400) {
+        const k = 1 - Math.abs(left) / 1000;
+        element.style.fontSize = `${12 + 4 * k}px`;
+        element.style.top = `-${5 * k}px`;
+      }
+    }
   }
 
   public processEvent(e: EditEvent) {
@@ -829,7 +980,10 @@ class Editor {
         return;
       }
 
-      const dr = Math.min(props.bufferRotation, props.bufferRotation * elapsed * 0.01);
+      let dr = props.bufferRotation * elapsed * 0.01;
+      if(Math.abs(dr) > Math.abs(props.bufferRotation)) {
+        dr = props.bufferRotation;
+      }
       props.bufferRotation -= dr;
       props.rotation += dr;
       this.enableCropMode();
