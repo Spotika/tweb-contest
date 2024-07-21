@@ -44,7 +44,7 @@ function moveFiles(outPath) {
     // @ts-ignore
     jsVariables[match[1]] = match[2];
     // @ts-ignore
-    o.push(`${match[1]}: '${match[2].slice(1)}'`);
+    o.push(`${match[1].replace('-', '_')}: '${match[2].slice(1)}'`);
   });
   const TAB = '  ';
   fs.writeFileSync(tsOutPath, `const Icons = {\n${TAB}${o.join(`,\n${TAB}`)}\n};\n\nexport default Icons;\n`);

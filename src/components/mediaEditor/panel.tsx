@@ -33,6 +33,11 @@ export type CropProperties = {
   ratioY: number
 }
 
+export type EditProperties = {
+  icon: Icon;
+  name: string;
+}
+
 export type EnhanceEvent = {
   type: 'enhance';
   filter: EnhanceProperties['filter'];
@@ -47,6 +52,7 @@ export type CropEvent = {
 export type EditorProperties = {
   enhance: EnhanceProperties[];
   crop: string[];
+  edit: null;
 };
 
 export type EditEvent = EnhanceEvent | CropEvent;
@@ -113,7 +119,8 @@ class Panel {
     }],
     crop: [
       '3_2', '4_3', '5_4', '7_5', '16_9'
-    ]
+    ],
+    edit: null
   };
 
 
@@ -216,6 +223,7 @@ class Panel {
     // Tabs creation
     this.createEnhanceTab();
     this.createCropTab();
+    this.createEditTab();
     renderElement.replaceWith(this.container);
   }
 
@@ -367,6 +375,186 @@ class Panel {
       const event = new InputEvent('click');
       freeButton.dispatchEvent(event);
     });
+  }
+
+  private createEditTab() {
+    const container = this.tabs.edit;
+
+    const currentColor = 'white';
+
+    const colorPickContainer = document.createElement('div');
+    colorPickContainer.classList.add('color-pick-container');
+
+    const colorButtonsContainer = document.createElement('div');
+    colorButtonsContainer.classList.add('color-buttons-container');
+
+
+    // color pick button
+    const colorPickerButton = document.createElement('button');
+    colorPickerButton.classList.add('color-picker-button');
+    const colorPickerButtonCore = document.createElement('div');
+    colorPickerButtonCore.classList.add('color-picker-button-core');
+    colorPickerButtonCore.style.backgroundImage = `url('assets/img/color-picker.png')`;
+    colorPickerButton.append(colorPickerButtonCore);
+
+
+    // color pick slider
+    const colorPickSliderContainer = document.createElement('div');
+    colorPickSliderContainer.classList.add('color-pick-slider-container', 'inactive');
+
+    const colorPickSlider = document.createElement('input');
+    colorPickSlider.classList.add('color-pick-slider');
+    colorPickSlider.type = 'range';
+    colorPickSlider.min = '0';
+    colorPickSlider.value = '50';
+    colorPickSlider.max = '100';1
+
+    // color slider functional
+    {
+      const gradientColors = [
+        {pos: 0, color: '#FF0000'},
+        {pos: 14.29, color: '#FF8A00'},
+        {pos: 28.57, color: '#FFE600'},
+        {pos: 42.86, color: '#14FF00'},
+        {pos: 57.14, color: '#00A3FF'},
+        {pos: 71.43, color: '#0500FF'},
+        {pos: 85.71, color: '#AD00FF'},
+        {pos: 100, color: '#FF0000'}
+      ];
+      colorPickSlider.addEventListener('input', () => {
+        const color = getColorFromValue(colorPickSlider.value);
+        changeCurrentColor(color);
+      });
+      function getColorFromValue(value: string) {
+        const color = getInterpolatedColor(parseFloat(value));
+        return color;
+      }
+
+      function getInterpolatedColor(value: number) {
+        for(let i = 0; i < gradientColors.length - 1; i++) {
+          const start = gradientColors[i];
+          const end = gradientColors[i + 1];
+
+          if(value >= start.pos && value <= end.pos) {
+            const ratio = (value - start.pos) / (end.pos - start.pos);
+            return interpolateColor(start.color, end.color, ratio);
+          }
+        }
+        return gradientColors[gradientColors.length - 1].color;
+      }
+
+      function interpolateColor(color1: string, color2: string, factor: number) {
+        const c1 = hexToRgb(color1);
+        const c2 = hexToRgb(color2);
+        const r = Math.round(c1.r + factor * (c2.r - c1.r));
+        const g = Math.round(c1.g + factor * (c2.g - c1.g));
+        const b = Math.round(c1.b + factor * (c2.b - c1.b));
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+
+      function hexToRgb(color: string) {
+        const hex = color.replace('#', '');
+        const bigint = parseInt(hex, 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return {r, g, b};
+      }
+    }
+
+    colorPickSliderContainer.append(colorPickSlider);
+    colorButtonsContainer.append(colorPickSliderContainer);
+
+
+    const showColorPicker = () => {
+      colorButtonsContainer.classList.add('inactive');
+      colorPickSliderContainer.classList.remove('inactive');
+    }
+
+    const hideColorPicker = () => {
+      colorButtonsContainer.classList.remove('inactive');
+      colorPickSliderContainer.classList.add('inactive');
+    }
+
+    const changeCurrentColor = (color: string) => {
+      colorPickContainer.style.backgroundColor = color;
+    }
+
+    const creataeColorButtonContext = (buttons: HTMLButtonElement[], onChange: (button: HTMLButtonElement) => void) => {
+      let activeButton = buttons[0];
+      activeButton.classList.add('active');
+
+      for(const button of buttons) {
+        if(button != activeButton) {
+          button.classList.add('inactive');
+        }
+        button.onclick = () => {
+          if(activeButton == button) {
+            if(activeButton == colorPickerButton) {
+              activeButton.classList.remove('active');
+              activeButton.classList.add('inactive');
+              activeButton = buttons[0];
+              activeButton.classList.add('active');
+              activeButton.classList.remove('inactive');
+              changeCurrentColor('rgb(255, 255, 255)');
+              hideColorPicker();
+            }
+            return;
+          };
+
+          if(button == colorPickerButton) {
+            showColorPicker();
+          } else if(activeButton == colorPickerButton) {
+            hideColorPicker();
+          }
+
+          activeButton.classList.remove('active');
+          activeButton.classList.add('inactive');
+          activeButton = button;
+          if(activeButton == colorPickerButton) {
+            const initialInputEvent = new InputEvent('input');
+            colorPickSlider.dispatchEvent(initialInputEvent);
+          } else {
+            changeCurrentColor((button.children[0] as HTMLElement).style.backgroundColor);
+          }
+          activeButton.classList.add('active');
+          activeButton.classList.remove('inactive');
+          onChange(button);
+        }
+      }
+    }
+
+    const createColorButton = (color: string) => {
+      const button = document.createElement('button');
+      button.classList.add('color-button');
+
+      const buttonCore = document.createElement('div');
+      buttonCore.classList.add('color-button-core');
+
+      button.append(buttonCore);
+
+      buttonCore.style.backgroundColor = color;
+      button.style.backgroundColor = `${color}10`;
+      ripple(button);
+      colorButtonsContainer.append(button);
+
+      return button;
+    }
+
+    creataeColorButtonContext([
+      createColorButton('#FFFFFF'),
+      createColorButton('#FE4438'),
+      createColorButton('#FF8901'),
+      createColorButton('#FFD60A'),
+      createColorButton('#33C759'),
+      createColorButton('#62E5E0'),
+      createColorButton('#0A84FF'),
+      createColorButton('#BD5CF3'),
+      colorPickerButton
+    ], () => {});
+
+    colorPickContainer.append(colorButtonsContainer, colorPickSliderContainer, colorPickerButton);
+    container.append(colorPickContainer);
   }
 
   private updateActions() {
