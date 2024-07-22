@@ -292,9 +292,8 @@
   }
 }
 
-.editor-panel-content-edit {
-  padding: 16px 8px;
-  .color-pick-container {
+.color-pick-container {
+  .button-color-input-container {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -349,7 +348,8 @@
     .color-pick-slider-container {
       display: flex;
       align-items: center;
-      width: 90%;
+      width: 88%;
+      padding-left: 8px;
       padding-right: 16px;
       height: 20px;
 
@@ -372,7 +372,6 @@
         height: 20px;
         background: none;
         outline: 2px solid #FFFFFF;
-        // border: 2px solid #000;
         border-radius: 50%;
         cursor: pointer;
       }
@@ -385,9 +384,47 @@
       &.inactive {
         display: none;
       }
-
     }
   }
+
+  .color-picker {
+    overflow: visible;;
+    margin: 0;
+    padding: 8px 16px;
+    display: flex;
+    &.inactive {
+      display: none;
+    }
+
+    .color-picker-box {
+      width: 200px !important;
+      height: 120px !important;
+      border-radius: 10px;
+    }
+    //   rect {
+    //     // width: 200px !important;
+    //     // height: 120px !important;
+    //   }
+    // }
+
+    .color-picker-sliders {
+      // display: none;
+      // height: 20px;
+      // width: 0;
+      // opacity: 0;
+    }
+    .color-picker-inputs {
+      display: flex;
+      flex-direction: column;
+      max-width: 128px;
+      margin-left: 24px;
+    }
+  }
+}
+
+.editor-panel-content-brush {
+  padding: 16px 8px;
+
 }
 
 .editor-range-container {
