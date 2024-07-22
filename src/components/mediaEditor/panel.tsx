@@ -386,7 +386,43 @@ class Panel {
       console.log('color changed', color);
     });
 
+    const sizeSelectWrapper = document.createElement('div');
+    {
+      sizeSelectWrapper.classList.add('size-select-wrapper');
+
+      const textWrapper = document.createElement('div');
+      textWrapper.classList.add('size-select-text-wrapper');
+
+
+      const titleContainer = document.createElement('div');
+      titleContainer.classList.add('title-container');
+      titleContainer.textContent = 'Size';
+
+      const valueContainer = document.createElement('div');
+      valueContainer.classList.add('value-container');
+      valueContainer.textContent = '15';
+
+      textWrapper.append(titleContainer, valueContainer);
+
+      const slider = new RangeInput(
+        '5',
+        '25',
+        '1',
+        '15',
+        0
+      );
+
+      slider.input.addEventListener('input', () => {
+        // TODO: set the tool size value
+        valueContainer.textContent = slider.input.value.toString();
+      });
+
+      sizeSelectWrapper.append(textWrapper, slider.container);
+    }
+
     container.append(colorPicker.container);
+
+    container.append(sizeSelectWrapper);
   }
 
   private updateActions() {

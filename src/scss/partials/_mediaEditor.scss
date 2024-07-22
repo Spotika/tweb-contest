@@ -401,18 +401,7 @@
       height: 120px !important;
       border-radius: 10px;
     }
-    //   rect {
-    //     // width: 200px !important;
-    //     // height: 120px !important;
-    //   }
-    // }
 
-    .color-picker-sliders {
-      // display: none;
-      // height: 20px;
-      // width: 0;
-      // opacity: 0;
-    }
     .color-picker-inputs {
       display: flex;
       flex-direction: column;
@@ -425,6 +414,20 @@
 .editor-panel-content-brush {
   padding: 16px 8px;
 
+  .size-select-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-top: 16px;
+    padding: 0 16px;
+
+    .size-select-text-wrapper {
+      font-weight: 500;
+      color: var(--secondary-text-color);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+  }
 }
 
 .editor-range-container {
