@@ -212,6 +212,12 @@ class Panel {
       } else {
         this.editorRef.disableCropMode();
       }
+
+      if(id == 2) {
+        this.editorRef.enableBrushMode();
+      } else {
+        this.editorRef.disableBrushMode();
+      }
     });
     this.selectTab(0, false); // TODO: change to 0 if not debug
 
@@ -384,12 +390,12 @@ class Panel {
 
 
     const colorPicker = new EditorColorPicker((color) => {
-      // const secondaryTextColor = getComputedStyle(container).getPropertyValue('--selected-color');
       this.container.style.setProperty('--selected-color', color);
-      // console.log('color changed', color);
+      this.editorRef.setBrushColor(color);
     });
     container.append(colorPicker.container);
     this.container.style.setProperty('--selected-color', 'white');
+    this.editorRef.setBrushColor('white');
 
 
     // * size selection
@@ -420,8 +426,8 @@ class Panel {
       );
 
       slider.input.addEventListener('input', () => {
-        // TODO: set the tool size value
-        valueContainer.textContent = slider.input.value.toString();
+        valueContainer.textContent = slider.input.value;
+        this.editorRef.changeBrushSize(parseInt(slider.input.value))
       });
 
       sizeSelectWrapper.append(textWrapper, slider.container);
@@ -831,10 +837,11 @@ class Panel {
         buttons.push(variantButton(toolContainer, key[0].toUpperCase() + key.slice(1), key));
       }
 
-      setButtonContext(buttons, () => {});
+      setButtonContext(buttons, (button: HTMLButtonElement) => {
+        this.editorRef.changeBrushTool(button.id.split('-')[2] as any);
+      });
       tools.append(...buttons);
       toolPanelWrapper.append(title, tools);
-
     }
     container.append(toolPanelWrapper);
   }

@@ -70,6 +70,25 @@ type PropertiesType = {
       x: number;
       y: number;
     }
+  },
+  brush: {
+    canvas?: HTMLCanvasElement;
+    selectedTool: 'pen' | 'arrow' | 'brush' | 'neon' | 'blur' | 'eraser',
+    size: number;
+    paths: {
+      path: {
+        x: number;
+        y: number;
+        size: number;
+      }[];
+      color: string;
+      tool: PropertiesType['brush']['selectedTool']
+    }[];
+    mouseDown: boolean;
+    selectedColor: string;
+    onMouseDown: (e: MouseEvent) => void;
+    onMouseMove: (e: MouseEvent) => void;
+    onMouseUp: (e: MouseEvent) => void;
   }
 };
 
@@ -113,6 +132,16 @@ class Editor {
       ratio: {
         type: 'free'
       }
+    },
+    brush: {
+      selectedTool: 'pen',
+      size: 15,
+      paths: [],
+      mouseDown: false,
+      selectedColor: 'white',
+      onMouseMove: this.brushMouseMove.bind(this),
+      onMouseDown: this.brushMouseDown.bind(this),
+      onMouseUp: this.brushMouseUp.bind(this)
     }
   };
 
@@ -315,10 +344,10 @@ class Editor {
     const rotation = Math.PI / 84 * ticks;
     props.bufferRotation += rotation;
     props.realRotation += rotation;
+    this.updateCropPanel();
     if(!props.rotationAnimationInProgress) {
       this.cropRotateBuffer();
     }
-    this.updateCropPanel();
   }
 
   private updateCropPanel() {
@@ -389,7 +418,7 @@ class Editor {
     this.doCrop();
   }
 
-  // pipeline functions (in their order)
+  // * pipeline functions (in their order)
   private doEnhance() {
     const ctx = this.properties.enhance.canvas.getContext('2d', {willReadFrequently: true});
     const [width, height] = [this.sourceImage.width, this.sourceImage.height];
@@ -625,10 +654,41 @@ class Editor {
     grain();
 
     // next pipeline state
+    this.doBrush();
+  }
+
+  private doBrush() {
+    const prevCanvas: HTMLCanvasElement = this.properties.enhance.canvas;
+    const props = this.properties.brush;
+
+    const ctx = props.canvas.getContext('2d');
+    ctx.drawImage(prevCanvas, 0, 0);
+
+    for(const pathObj of props.paths) {
+      const {path, color, tool} = pathObj;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+
+      for(let i = 1; i < path.length; i++) {
+        const prevPoint = path[i - 1];
+        const currentPoint = path[i];
+
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(prevPoint.x, prevPoint.y);
+        ctx.lineTo(currentPoint.x, currentPoint.y);
+        ctx.stroke();
+        ctx.beginPath()
+
+      }
+    }
+
     this.doCrop();
   }
 
   private doCrop() {
+    const prevCanvas: HTMLCanvasElement = this.properties.brush.canvas;
+
     // final pipeline state
     const mainCtx = this.canvas.getContext('2d');
     const ctx = this.properties.crop.canvas.getContext('2d');
@@ -654,7 +714,7 @@ class Editor {
     const xAX = Math.cos(props.rotation);
     const xAY = Math.sin(props.rotation);
     rotationCtx.setTransform(xAX * props.mirror, xAY * props.mirror, -xAY, xAX, this.properties.crop.canvas.width / 2 - Editor.imagePadding, this.properties.crop.canvas.height / 2 - Editor.imagePadding);
-    rotationCtx.drawImage(this.properties.enhance.canvas, -this.properties.enhance.canvas.width / 2, -this.properties.enhance.canvas.height / 2);
+    rotationCtx.drawImage(prevCanvas, -prevCanvas.width / 2, -prevCanvas.height / 2);
 
 
     if(this.properties.crop.enabled) {
@@ -668,6 +728,7 @@ class Editor {
 
     rotationCanvas.remove();
   }
+
 
   public async getModifiedFile(newFileName: string): Promise<File> {
     this.disableCropMode();
@@ -1103,6 +1164,101 @@ class Editor {
     ctx.setTransform(1, 0, 0, 1, -cropX, -cropY);
 
     this.doCrop();
+  }
+
+  public changeBrushTool(tool: PropertiesType['brush']['selectedTool']) {
+    this.properties.brush.selectedTool = tool;
+  }
+
+  public changeBrushSize(size: number) {
+    this.properties.brush.size = size;
+  }
+
+  private brushMouseMove(e: MouseEvent) {
+    const props = this.properties.brush;
+
+    if (!props.mouseDown) return;
+
+    const path = props.paths[props.paths.length - 1].path;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const relX = e.clientX - rect.left + this.properties.crop.x;
+    const relY = e.clientY - rect.top + this.properties.crop.y;
+
+    let x1 = relX * this.canvas.width / rect.width;
+    let y1 = relY * this.canvas.height / rect.height;
+
+    // // Convert (x, y) from wrapper canvas to wrapped (rotated) canvas coordinates
+    // const wrappedCanvasWidth = props.canvas.width;
+    // const wrappedCanvasHeight = props.canvas.height;
+    const rotation = this.properties.crop.rotation;
+
+    // // Center of the wrapped canvas
+    // const centerX = wrappedCanvasWidth / 2;
+    // const centerY = wrappedCanvasHeight / 2;
+
+    // // Translate the point to the origin (center of the wrapped canvas)
+    // let translatedX = x - centerX;
+    // let translatedY = y - centerY;
+
+    // // Apply rotation transformation
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+
+    // const rotatedX = translatedX * cos - translatedY * sin;
+    // const rotatedY = translatedX * sin + translatedY * cos;
+
+    // Translate back to the original position
+    // x = rotatedX + centerX;
+    // y = rotatedY + centerY;
+
+    let x = cos*x1 - sin*y1 + sin;
+    let y = sin*x1 + cos*y1;
+
+    path.push({
+        x, y,
+        size: props.size
+    });
+
+    this.doBrush();
+}
+
+
+  private brushMouseDown() {
+    const props = this.properties.brush;
+
+    props.mouseDown = true;
+    props.paths.push({
+      color: props.selectedColor,
+      path: [],
+      tool: props.selectedTool
+    });
+  }
+
+  private brushMouseUp() {
+    const props = this.properties.brush;
+
+    props.mouseDown = false;
+  }
+
+  public enableBrushMode() {
+    const props = this.properties.brush;
+
+    this.canvas.addEventListener('mousemove', props.onMouseMove);
+    this.canvas.addEventListener('mousedown', props.onMouseDown);
+    this.canvas.addEventListener('mouseup', props.onMouseUp);
+  }
+
+  public disableBrushMode() {
+    const props = this.properties.brush;
+
+    this.canvas.removeEventListener('mousemove', props.onMouseMove);
+    this.canvas.removeEventListener('mousedown', props.onMouseDown);
+    this.canvas.removeEventListener('mouseup', props.onMouseUp);
+  }
+
+  public setBrushColor(color: string) {
+    this.properties.brush.selectedColor = color;
   }
 }
 
