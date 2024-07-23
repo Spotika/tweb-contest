@@ -155,6 +155,8 @@ class EditorColorPicker {
       let activeButton = buttons[0];
       activeButton.classList.add('active');
 
+      let prevActive: null | HTMLButtonElement;
+
       for(const button of buttons) {
         if(button != activeButton) {
           button.classList.add('inactive');
@@ -164,9 +166,10 @@ class EditorColorPicker {
             if(activeButton == colorPickerButton) {
               activeButton.classList.remove('active');
               activeButton.classList.add('inactive');
-              activeButton = buttons[0];
+              activeButton = prevActive || buttons[0];
               activeButton.classList.add('active');
               activeButton.classList.remove('inactive');
+              this.onChange((activeButton.children[0] as HTMLElement).style.backgroundColor);
               changeCurrentColor({r: 255, g: 255, b: 255});
               hideColorPicker();
             }
@@ -178,11 +181,12 @@ class EditorColorPicker {
           } else if(activeButton == colorPickerButton) {
             hideColorPicker();
           }
-
+          prevActive = activeButton;
           activeButton.classList.remove('active');
           activeButton.classList.add('inactive');
           activeButton = button;
           if(activeButton == colorPickerButton) {
+            this.onChange(colorPicker.getCurrentColor().rgb);
           } else {
             this.onChange((button.children[0] as HTMLElement).style.backgroundColor);
           }

@@ -252,7 +252,6 @@
 }
 
 .editor-panel-content-crop {
-  padding: 8px;
   .variant-button {
     padding: 16px;
     overflow: hidden;
@@ -274,10 +273,11 @@
     &:hover {
       background-color: var(--light-secondary-text-color);
     }
+    &.active {
+      background-color: var(--light-secondary-text-color);
+    }
   }
-  .active {
-    background-color: var(--light-secondary-text-color);
-  }
+  padding: 8px;
 
   .variant-container {
     display: flex;
@@ -414,6 +414,8 @@
 .editor-panel-content-brush {
   padding: 16px 8px;
 
+  // --selected-color: white;
+
   .size-select-wrapper {
     display: flex;
     flex-direction: column;
@@ -426,6 +428,68 @@
       display: flex;
       justify-content: space-between;
       margin-bottom: 22px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      background-color: var(--selected-color);
+    }
+    .editor-range-fill {
+      background-color: var(--selected-color);
+    }
+  }
+
+  .tool-panel-wrapper {
+    .title {
+      color: var(--secondary-text-color);
+      // color: var(--selected-color);
+      font-weight: 500;
+      width: 100px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .tool-container {
+      margin-right: 16px;
+      display: flex;
+      align-items: center;
+
+        &::before {
+          content: '';
+          width: 100px;
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(to right, var(--surface-color), rgba(0, 0, 0, 0));
+          z-index: 1; /* Ensure the gradient is above the element content */
+          pointer-events: none; /* Allow clicks to pass through to the element below */
+        }
+    }
+
+    .variant-button {
+      padding: 16px;
+      overflow: hidden;
+      width: 100%;
+      transition: all 0.2s;
+      border-radius: 10px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      div {
+        font-size: 16px;
+        font-weight: 500;
+      }
+      span {
+        font-size: 24px;
+        margin-right: 32px;
+      }
+      &:hover {
+        background-color: var(--light-secondary-text-color);
+      }
+      &.active {
+        background-color: var(--light-secondary-text-color);
+      }
     }
   }
 }
