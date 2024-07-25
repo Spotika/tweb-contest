@@ -673,7 +673,7 @@ class Editor {
         const prevPoint = path[i - 1];
         const currentPoint = path[i];
 
-        ctx.lineWidth = 2;
+        ctx.lineWidth = currentPoint.size;
         ctx.beginPath();
         ctx.moveTo(prevPoint.x, prevPoint.y);
         ctx.lineTo(currentPoint.x, currentPoint.y);
@@ -1202,8 +1202,8 @@ class Editor {
     // let translatedY = y - centerY;
 
     // // Apply rotation transformation
-    const cos = Math.cos(-rotation);
-    const sin = Math.sin(-rotation);
+    const cos = Math.abs(Math.cos(-rotation));
+    const sin = Math.abs(Math.sin(-rotation));
 
     // const rotatedX = translatedX * cos - translatedY * sin;
     // const rotatedY = translatedX * sin + translatedY * cos;
@@ -1212,8 +1212,15 @@ class Editor {
     // x = rotatedX + centerX;
     // y = rotatedY + centerY;
 
-    let x = cos*x1 - sin*y1 + sin;
+    const h = props.canvas.width * sin;
+    const w = props.canvas.height * sin;
+
+
+
+    let x = cos*x1 - sin*y1;
     let y = sin*x1 + cos*y1;
+
+    console.log(x, y);
 
     path.push({
         x, y,
