@@ -55,6 +55,7 @@ export type EditorProperties = {
   enhance: EnhanceProperties[];
   crop: string[];
   brush: null;
+  text: null;
 };
 
 export type EditEvent = EnhanceEvent | CropEvent;
@@ -122,6 +123,7 @@ class Panel {
     crop: [
       '3_2', '4_3', '5_4', '7_5', '16_9'
     ],
+    text: null,
     brush: null
   };
 
@@ -213,7 +215,7 @@ class Panel {
         this.editorRef.disableCropMode();
       }
 
-      if(id == 2) {
+      if(id == 3) {
         this.editorRef.enableBrushMode();
       } else {
         this.editorRef.disableBrushMode();
@@ -231,7 +233,8 @@ class Panel {
     // Tabs creation
     this.createEnhanceTab();
     this.createCropTab();
-    this.createBruhsTab();
+    this.createBrushTab();
+    this.createTextTab();
     renderElement.replaceWith(this.container);
   }
 
@@ -385,14 +388,14 @@ class Panel {
     });
   }
 
-  private createBruhsTab() {
+  private createBrushTab() {
     const container = this.tabs.brush;
 
 
     const colorPicker = new EditorColorPicker((color) => {
       this.container.style.setProperty('--selected-color', color);
       this.editorRef.setBrushColor(color);
-    });
+    }, 'brush');
     container.append(colorPicker.container);
     this.container.style.setProperty('--selected-color', 'white');
     this.editorRef.setBrushColor('white');
@@ -844,6 +847,14 @@ class Panel {
       toolPanelWrapper.append(title, tools);
     }
     container.append(toolPanelWrapper);
+  }
+
+  private createTextTab() {
+    const container = this.tabs.text;
+
+    const colorPicker = new EditorColorPicker((color) => {
+    }, 'text');
+    container.append(colorPicker.container);
   }
 
   private updateActions() {

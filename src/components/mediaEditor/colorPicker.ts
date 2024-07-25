@@ -38,7 +38,7 @@ class EditorColorPicker {
   private onChange: (color: string) => void;
 
 
-  constructor(onChange: (color: string) => void) {
+  constructor(onChange: (color: string) => void, idPrefix: string) {
     this.onChange = onChange;
     const container = this.container;
 
@@ -74,7 +74,7 @@ class EditorColorPicker {
 
 
     // color picker
-    const colorPicker = new ColorPicker();
+    const colorPicker = new ColorPicker(idPrefix);
     colorPicker.onChange = (color) => {
       this.onChange(color.rgb);
     }

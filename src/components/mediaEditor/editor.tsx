@@ -654,40 +654,98 @@ class Editor {
     grain();
 
     // next pipeline state
-    this.doBrush();
+    this.doCrop();
   }
 
-  private doBrush() {
-    const prevCanvas: HTMLCanvasElement = this.properties.enhance.canvas;
+  private drawBrushPath(paths: PropertiesType['brush']['paths'] | 'extendLastPath', drawArrows: boolean = false) {
     const props = this.properties.brush;
-
     const ctx = props.canvas.getContext('2d');
-    ctx.drawImage(prevCanvas, 0, 0);
 
-    for(const pathObj of props.paths) {
+    let beginPathFrom = 1;
+
+    if(paths == 'extendLastPath') {
+      var newPaths = [props.paths[props.paths.length - 1]];
+      beginPathFrom = newPaths[0].path.length - 1
+    } else {
+      var newPaths = paths;
+    }
+
+    for(const pathObj of newPaths) {
       const {path, color, tool} = pathObj;
       ctx.fillStyle = color;
       ctx.strokeStyle = color;
 
-      for(let i = 1; i < path.length; i++) {
+      for(let i = beginPathFrom; i < path.length; i++) {
         const prevPoint = path[i - 1];
         const currentPoint = path[i];
+        ctx.lineWidth = props.size;
 
-        ctx.lineWidth = 2;
+        if(tool == 'pen' || tool == 'arrow') {
+          ctx.beginPath();
+          ctx.arc(prevPoint.x, prevPoint.y, props.size / 2, 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, props.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(currentPoint.x, currentPoint.y);
+          ctx.stroke();
+          ctx.closePath()
+        }
+      }
+
+      if(tool == 'arrow' && drawArrows && pathObj.path.length > 1) {
+        // TODO: add accurate to arrow head and change arrow head form
+
+        const fromX = path[path.length - 2].x, fromY = path[path.length - 2].y;
+        const toX = path[path.length - 1].x, toY = path[path.length - 1].y;
+
+        const headLength = 10;
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+
+        // Draw the main line
         ctx.beginPath();
-        ctx.moveTo(prevPoint.x, prevPoint.y);
-        ctx.lineTo(currentPoint.x, currentPoint.y);
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
         ctx.stroke();
-        ctx.beginPath()
 
+        // Draw the arrow head
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+        ctx.lineTo(toX, toY);
+        ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+        ctx.stroke();
+        ctx.fill();
       }
     }
+  }
+
+
+  private doBrush() {
+    const props = this.properties.brush;
+    const ctx = props.canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, props.canvas.width, props.canvas.height);
+
+    this.drawBrushPath(props.paths, true);
 
     this.doCrop();
   }
 
   private doCrop() {
-    const prevCanvas: HTMLCanvasElement = this.properties.brush.canvas;
+    // const prevCanvas: HTMLCanvasElement = this.properties.brush.canvas;
+
+    // * create merge canvas
+    const mergeCanvas = document.createElement('canvas');
+    mergeCanvas.width = this.properties.enhance.canvas.width;
+    mergeCanvas.height = this.properties.enhance.canvas.height;
+
+    const mergeCtx = mergeCanvas.getContext('2d');
+    mergeCtx.drawImage(this.properties.enhance.canvas, 0, 0);
+    mergeCtx.drawImage(this.properties.brush.canvas, 0, 0);
 
     // final pipeline state
     const mainCtx = this.canvas.getContext('2d');
@@ -714,7 +772,7 @@ class Editor {
     const xAX = Math.cos(props.rotation);
     const xAY = Math.sin(props.rotation);
     rotationCtx.setTransform(xAX * props.mirror, xAY * props.mirror, -xAY, xAX, this.properties.crop.canvas.width / 2 - Editor.imagePadding, this.properties.crop.canvas.height / 2 - Editor.imagePadding);
-    rotationCtx.drawImage(prevCanvas, -prevCanvas.width / 2, -prevCanvas.height / 2);
+    rotationCtx.drawImage(mergeCanvas, -mergeCanvas.width / 2, -mergeCanvas.height / 2);
 
 
     if(this.properties.crop.enabled) {
@@ -727,6 +785,7 @@ class Editor {
     mainCtx.drawImage(ctx.canvas, -Editor.imagePadding, -Editor.imagePadding);
 
     rotationCanvas.remove();
+    mergeCanvas.remove();
   }
 
 
@@ -918,47 +977,6 @@ class Editor {
     if(newY + newHeight > this.canvas.height - 2 * Editor.imagePadding) {
       newHeight = this.canvas.height - 2 * Editor.imagePadding - newY;
     }
-
-
-    // if(newWidth <= 1) {
-    //   newWidth = 1;
-    //   const translate = {
-    //     rt: 'lt',
-    //     lt: 'rt',
-    //     lb: 'rb',
-    //     rb: 'lb',
-    //     center: 'center'
-    //   } as const;
-
-    //   props.activeCorner = translate[props.activeCorner];
-    // }
-
-    // if(newHeight < 0) {
-    //   newHeight = 1;
-    //   const translate = {
-    //     rt: 'rb',
-    //     rb: 'rt',
-    //     lt: 'lb',
-    //     lb: 'lt',
-    //     center: 'center'
-    //   } as const;
-
-    //   // switch(props.activeCorner) {
-    //   //   case 'rt':
-    //   //     props.activeCorner = 'rb';
-    //   //     newY += newHeight;
-    //   //     break;
-    //   //   case 'rb':
-    //   //     break;
-    //   //   case 'lt':
-    //   //     break;
-    //   //   case 'lb':
-    //   //     break;
-    //   // }
-    //   props.activeCorner = translate[props.activeCorner];
-    // }
-
-    // console.log(newWidth, newHeight, newX, newY);
 
     props.width = newWidth;
     props.height = newHeight;
@@ -1188,39 +1206,36 @@ class Editor {
     let x1 = relX * this.canvas.width / rect.width;
     let y1 = relY * this.canvas.height / rect.height;
 
-    // // Convert (x, y) from wrapper canvas to wrapped (rotated) canvas coordinates
-    // const wrappedCanvasWidth = props.canvas.width;
-    // const wrappedCanvasHeight = props.canvas.height;
     const rotation = this.properties.crop.rotation;
 
-    // // Center of the wrapped canvas
-    // const centerX = wrappedCanvasWidth / 2;
-    // const centerY = wrappedCanvasHeight / 2;
-
-    // // Translate the point to the origin (center of the wrapped canvas)
-    // let translatedX = x - centerX;
-    // let translatedY = y - centerY;
-
-    // // Apply rotation transformation
     const cos = Math.cos(-rotation);
     const sin = Math.sin(-rotation);
 
-    // const rotatedX = translatedX * cos - translatedY * sin;
-    // const rotatedY = translatedX * sin + translatedY * cos;
+    // TODO: create transition from wrapper canvas to wrapped canvas
 
-    // Translate back to the original position
-    // x = rotatedX + centerX;
-    // y = rotatedY + centerY;
-
-    let x = cos*x1 - sin*y1 + sin;
+    let x = cos*x1 - sin*y1;
     let y = sin*x1 + cos*y1;
+
+    // console.log(x, y, props.canvas.width, props.canvas.height, sin, cos);
+
+
+    if(sin > 0 && cos > 0) {
+      const w = sin * props.canvas.width;
+      x += sin * w;
+      y -= cos * w;
+    } else if(sin < 0 && cos > 0) {
+      // const w = props.canvas.height * cos;
+      // x +=
+      // y -= w * cos;
+      // x -= w * sin;
+    }
 
     path.push({
         x, y,
         size: props.size
     });
-
-    this.doBrush();
+    this.drawBrushPath('extendLastPath');
+    this.doCrop();
 }
 
 
@@ -1239,6 +1254,7 @@ class Editor {
     const props = this.properties.brush;
 
     props.mouseDown = false;
+    this.doBrush();
   }
 
   public enableBrushMode() {
