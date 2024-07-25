@@ -680,7 +680,6 @@ class Editor {
         const currentPoint = path[i];
         ctx.lineWidth = props.size;
 
-<<<<<<< HEAD
         if(tool == 'pen' || tool == 'arrow') {
           ctx.beginPath();
           ctx.arc(prevPoint.x, prevPoint.y, props.size / 2, 0, Math.PI * 2);
@@ -706,9 +705,7 @@ class Editor {
         const angle = Math.atan2(toY - fromY, toX - fromX);
 
         // Draw the main line
-=======
-        ctx.lineWidth = currentPoint.size;
->>>>>>> a458803f632b5b1b866e3f1cb06508d9b572677c
+
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
         ctx.lineTo(toX, toY);
@@ -1212,26 +1209,12 @@ class Editor {
 
     const rotation = this.properties.crop.rotation;
 
-<<<<<<< HEAD
     const cos = Math.cos(-rotation);
     const sin = Math.sin(-rotation);
-=======
-    // // Center of the wrapped canvas
-    // const centerX = wrappedCanvasWidth / 2;
-    // const centerY = wrappedCanvasHeight / 2;
 
-    // // Translate the point to the origin (center of the wrapped canvas)
-    // let translatedX = x - centerX;
-    // let translatedY = y - centerY;
-
-    // // Apply rotation transformation
-    const cos = Math.abs(Math.cos(-rotation));
-    const sin = Math.abs(Math.sin(-rotation));
->>>>>>> a458803f632b5b1b866e3f1cb06508d9b572677c
 
     // TODO: create transition from wrapper canvas to wrapped canvas
 
-<<<<<<< HEAD
     let x = cos*x1 - sin*y1;
     let y = sin*x1 + cos*y1;
 
@@ -1248,21 +1231,6 @@ class Editor {
       // y -= w * cos;
       // x -= w * sin;
     }
-=======
-    // Translate back to the original position
-    // x = rotatedX + centerX;
-    // y = rotatedY + centerY;
-
-    const h = props.canvas.width * sin;
-    const w = props.canvas.height * sin;
-
-
-
-    let x = cos*x1 - sin*y1;
-    let y = sin*x1 + cos*y1;
-
-    console.log(x, y);
->>>>>>> a458803f632b5b1b866e3f1cb06508d9b572677c
 
     path.push({
         x, y,

@@ -468,10 +468,6 @@ class Panel {
         const button = document.createElement('button');
         button.id = 'variant-button-' + filter;
         button.classList.add('variant-button');
-        // if(icon_name != null) {
-        //   const icon = Icon(icon_name);
-        //   button.append(icon);
-        // }
 
         button.append(element);
 
@@ -854,7 +850,126 @@ class Panel {
 
     const colorPicker = new EditorColorPicker((color) => {
     }, 'text');
+
+
+    const createButtonContext = (buttons: HTMLButtonElement[], onChange: (key: string) => void) => {
+      let activeButton = buttons[0];
+      activeButton.classList.add('active');
+
+      for(const button of buttons) {
+        button.addEventListener('click', () => {
+          if(button == activeButton) return;
+
+          activeButton.classList.remove('active');
+          activeButton = button;
+          activeButton.classList.add('active');
+
+          onChange(activeButton.getAttribute('key'));
+        });
+      }
+    }
+
+    const textVariantsContainer = document.createElement('div');
+    textVariantsContainer.classList.add('text-variants-container');
+
+    {
+      const createVariantButton = (icon: Icon, key: string): HTMLButtonElement => {
+        const button = document.createElement('button');
+        button.classList.add('variant-button');
+        ripple(button);
+        button.append(Icon(icon));
+        button.setAttribute('key', key);
+
+        return button;
+      }
+
+      const alignContainer = document.createElement('div');
+      alignContainer.classList.add('align-container');
+      const alignButtons = [
+        createVariantButton('alignleft', 'left'),
+        createVariantButton('aligncenter', 'center'),
+        createVariantButton('alignright', 'right'),
+      ]
+      alignContainer.append(...alignButtons);
+      createButtonContext(alignButtons, (key: string) => {
+
+      });
+
+
+      const strokeContainer = document.createElement('div');
+      strokeContainer.classList.add('stroke-container');
+
+      const strokeButtons = [
+        createVariantButton('textregular', 'regular'),
+        createVariantButton('textoutline','outline'),
+        createVariantButton('textinverse', 'inverse'),
+      ]
+      strokeContainer.append(...strokeButtons);
+      createButtonContext(strokeButtons, (key: string) => {});
+
+      textVariantsContainer.append(alignContainer, strokeContainer);
+    }
+
+    const sizeSelectWrapper = document.createElement('div');
+    {
+      sizeSelectWrapper.classList.add('size-select-wrapper');
+
+      const textWrapper = document.createElement('div');
+      textWrapper.classList.add('size-select-text-wrapper');
+
+
+      const titleContainer = document.createElement('div');
+      titleContainer.classList.add('title-container');
+      titleContainer.textContent = 'Size';
+
+      const valueContainer = document.createElement('div');
+      valueContainer.classList.add('value-container');
+      valueContainer.textContent = '24';
+
+      textWrapper.append(titleContainer, valueContainer);
+
+      const slider = new RangeInput(
+        '12',
+        '36',
+        '1',
+        '24',
+        0
+      );
+
+      slider.input.addEventListener('input', () => {
+        valueContainer.textContent = slider.input.value;
+      });
+
+      sizeSelectWrapper.append(textWrapper, slider.container);
+    }
+
+    const fontSelectWrapper = document.createElement('div');
+    fontSelectWrapper.classList.add('font-select-wrapper');
+    {
+      const title = document.createElement('div');
+      title.classList.add('title');
+      title.textContent = 'Font';
+
+      const fonts = ['Roboto', 'Typewriter', 'Avenir Next', 'Courier New', 'Noteworthy', 'Georgia', 'Papyrus', 'Shell Roundhand'];
+
+      const createFontButton = (font: string): HTMLButtonElement => {
+        const button = document.createElement('button');
+        button.classList.add('font-button');
+        button.setAttribute('key', font);
+        ripple(button);
+        button.textContent = font;
+        return button;
+      }
+
+      const fontButtons = fonts.map(createFontButton);
+      createButtonContext(fontButtons, (font: string) => {});
+      fontSelectWrapper.append(title,...fontButtons);
+    }
+
     container.append(colorPicker.container);
+    container.append(textVariantsContainer);
+    container.append(sizeSelectWrapper);
+    container.append(fontSelectWrapper);
   }
 
   private updateActions() {
