@@ -106,7 +106,14 @@ type PropertiesType = {
     onMouseDown: (e: MouseEvent) => void;
     onMouseMove: (e: MouseEvent) => void;
     onMouseUp: (e: MouseEvent) => void;
-  }
+  };
+  text: {
+    canvas?: HTMLCanvasElement
+    onDoubleClick: (e: MouseEvent) => void;
+    objects: SVGElement[];
+    // onMouseMove: (e: MouseEvent) => void;
+    // onMouseUp: (e: MouseEvent) => void;
+  };
 };
 
 class Editor {
@@ -160,6 +167,10 @@ class Editor {
       onMouseMove: this.brushMouseMove.bind(this),
       onMouseDown: this.brushMouseDown.bind(this),
       onMouseUp: this.brushMouseUp.bind(this)
+    },
+    text: {
+      onDoubleClick: this.textOnDoubleClick.bind(this),
+      objects: []
     }
   };
 
@@ -1341,6 +1352,20 @@ void main() {
 
   public setBrushColor(color: string) {
     this.properties.brush.selectedColor = color;
+  }
+
+  public enableTextMode() {
+    const props = this.properties.text;
+    this.canvas.addEventListener('dblclick', props.onDoubleClick);
+  }
+
+  public disableTextMode() {
+    const props = this.properties.text;
+    this.canvas.removeEventListener('dblclick', props.onDoubleClick);
+  }
+
+  private textOnDoubleClick(event: MouseEvent) {
+    alert(1);
   }
 }
 

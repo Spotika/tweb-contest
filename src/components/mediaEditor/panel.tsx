@@ -1,4 +1,4 @@
-import {createEffect} from 'solid-js'
+import {createEffect, createSignal, JSX, onMount} from 'solid-js'
 import Icon from '../icon';
 import {ButtonIconTsx} from '../buttonIconTsx';
 import {render} from 'solid-js/web';
@@ -8,6 +8,9 @@ import Editor from './editor';
 import ripple from '../ripple';
 import InputField, {InputState} from '../inputField';
 import EditorColorPicker from './colorPicker';
+import {EmoticonsDropdown} from '../emoticonsDropdown';
+import StickersTab from '../emoticonsDropdown/tabs/stickers';
+import rootScope from '../../lib/rootScope';
 
 export const EnhanceFilters = [
   'Enhance',
@@ -56,6 +59,7 @@ export type EditorProperties = {
   crop: string[];
   brush: null;
   text: null;
+  smile: null;
 };
 
 export type EditEvent = EnhanceEvent | CropEvent;
@@ -124,7 +128,8 @@ class Panel {
       '3_2', '4_3', '5_4', '7_5', '16_9'
     ],
     text: null,
-    brush: null
+    brush: null,
+    smile: null
   };
 
 
@@ -220,6 +225,12 @@ class Panel {
       } else {
         this.editorRef.disableBrushMode();
       }
+
+      if(id == 2) {
+        this.editorRef.enableTextMode();
+      } else {
+        this.editorRef.disableTextMode();
+      }
     });
     this.selectTab(0, false); // TODO: change to 0 if not debug
 
@@ -235,6 +246,7 @@ class Panel {
     this.createCropTab();
     this.createBrushTab();
     this.createTextTab();
+    this.createSmileTab();
     renderElement.replaceWith(this.container);
   }
 
@@ -1001,6 +1013,27 @@ class Panel {
     container.append(textVariantsContainer);
     container.append(sizeSelectWrapper);
     container.append(fontSelectWrapper);
+  }
+
+  private createSmileTab() {
+    const container = this.tabs.smile;
+    const emoticonsDropdown = new EmoticonsDropdown({
+      customParentElement: container,
+      tabsToRender: [new StickersTab(rootScope.managers)],
+      stayAlwaysOpen: true,
+      fullHeight: true,
+      onMount: (el: any) => {
+        el.style.height = `100%`;
+        el.style.maxHeight = `100%`;
+        el.style.setProperty('--height', `100%`);
+      },
+      onMediaClicked: (e: any) => {
+        const el = e.target as HTMLDivElement;
+        const stickerId = el.dataset['docId'];
+        alert(stickerId);
+      }
+    });
+    emoticonsDropdown.toggle(true);
   }
 
   private updateActions() {
