@@ -496,7 +496,6 @@
 
 .editor-panel-content-text {
   padding: 16px 8px;
-  font-family: 'AmericanTypewriter', serif;
   .size-select-wrapper {
     display: flex;
     flex-direction: column;
@@ -566,6 +565,8 @@
       border-radius: 10px;
       justify-content: start;
       align-items: center;
+      font-weight: 600;
+      line-height: 20px;
       transition: all 0.2s;
       padding-left: 16px;
 

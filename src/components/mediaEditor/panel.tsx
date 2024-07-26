@@ -950,14 +950,45 @@ class Panel {
       title.classList.add('title');
       title.textContent = 'Font';
 
-      const fonts = ['Roboto', 'Typewriter', 'Avenir Next', 'Courier New', 'Noteworthy', 'Georgia', 'Papyrus', 'Shell Roundhand'];
+      // const fonts = ['Roboto', 'AmericanTypewriter', 'Avenir Next', 'Courier New', 'Noteworthy', 'Georgia', 'Papyrus', 'Shell Roundhand'];
+      const fonts = [{
+        label: 'Roboto',
+        family: 'Roboto',
+      }, {
+        label: 'Typewriter',
+        family: 'American Typewriter',
+      }, {
+        label: 'Avenir Next',
+        family: 'Avenir Next',
+      }, {
+        label: 'Courier New',
+        family: 'Courier New',
+      }, {
+        label: 'Noteworthy',
+        family: 'Noteworthy',
+      }, {
+        label: 'Georgia',
+        family: 'Georgia',
+      }, {
+        label: 'Papyrus',
+        family: 'Papyrus',
+      }, {
+        label: 'Shell Roundhand',
+        family: 'Shell Roundhand',
+      }];
 
-      const createFontButton = (font: string): HTMLButtonElement => {
+      const createFontButton = (font: typeof fonts[0]): HTMLButtonElement => {
         const button = document.createElement('button');
         button.classList.add('font-button');
-        button.setAttribute('key', font);
+        button.setAttribute('key', font.family);
+
+        if(font.family == 'Papyrus') {
+          button.style.fontWeight = '400';
+        }
+
         ripple(button);
-        button.textContent = font;
+        button.textContent = font.label;
+        button.style.fontFamily = `${font.family}, serif`;
         return button;
       }
 
