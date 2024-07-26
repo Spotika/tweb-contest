@@ -37,6 +37,23 @@ type PropertiesType = {
     values: {
       [key in EnhanceEvent['filter']]: number;
     };
+    program?: WebGLProgram;
+    positionLocation?: number;
+    texCoordLocation?: number;
+    textureSizeLocation?: WebGLUniformLocation;
+    brightnessLocation?: WebGLUniformLocation;
+    contrastLocation?: WebGLUniformLocation;
+    enhanceLocation?: WebGLUniformLocation;
+    saturationLocation?: WebGLUniformLocation;
+    warmthLocation?: WebGLUniformLocation;
+    fadeLocation?: WebGLUniformLocation;
+    highlightsLocation?: WebGLUniformLocation;
+    shadowsLocation?: WebGLUniformLocation;
+    vingetteLocation?: WebGLUniformLocation;
+    grainLocation?: WebGLUniformLocation;
+    sharpenLocation?: WebGLUniformLocation;
+    positionBuffer?: WebGLBuffer;
+    texCoordBuffer?: WebGLBuffer;
   },
   crop: {
     canvas?: HTMLCanvasElement;
@@ -100,12 +117,13 @@ class Editor {
   private sourceImage: HTMLImageElement;
   private canvasContainer: HTMLDivElement;
   private saveEvent: (event: EditEvent) => void;
+  private programInfo: any;
   static imagePadding: number = 16;
 
   private properties: PropertiesType = {
     enhance: {
       values: {} as any,
-      renderTimeout: 100,
+      renderTimeout: 10,
       needsRender: false
     },
     crop: {
@@ -117,15 +135,15 @@ class Editor {
       y: 0,
       width: 0,
       height: 0,
-      rotation: 0,
+      rotation: Math.PI,
       rotationAnimationInProgress: false,
       panelElements: [],
       degreeMarksContainer: null,
       panelRotationTicks: 0,
-      mirror: 1,
+      mirror: -1,
       bufferMirror: 0,
-      realMirror: 1,
-      realRotation: 0,
+      realMirror: -1,
+      realRotation: Math.PI,
       bufferRotation: 0,
       mirrorAnimationInProgress: false,
       enabled: false,
@@ -292,6 +310,7 @@ class Editor {
 
     renderElement.replaceWith(this.itemDiv);
 
+
     createEffect(async() => {
       this.sourceImage = new Image();
       const url = await apiManagerProxy.invoke('createObjectURL', file);
@@ -310,7 +329,7 @@ class Editor {
       }
 
       this.properties.crop.width = this.sourceImage.width;
-      this.properties.crop.height= this.sourceImage.height;
+      this.properties.crop.height = this.sourceImage.height;
 
       // set timeout limitation for redrawing
       this.refreshIntervalId = setInterval((() => {
@@ -320,9 +339,16 @@ class Editor {
         }
       }).bind(this), this.properties.enhance.renderTimeout);
 
+      this.prepareShaders();
+
       this.doEnhance();
       this.enableCropMode();
       this.disableCropMode();
+
+      // TODO: disable loader here
+      // setTimeout(() => {
+      //   alert(1)
+      // }, 0);
     });
   }
 
@@ -418,242 +444,280 @@ class Editor {
     this.doCrop();
   }
 
+  private prepareShaders() {
+    const gl = this.properties.enhance.canvas.getContext('webgl');
+    const props = this.properties.enhance;
+
+    const vertexShaderSource = `
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
+    varying vec2 v_texCoord;
+
+    void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        v_texCoord = a_texCoord;
+    }
+    `;
+
+    const fragmentShaderSource = `
+precision mediump float;
+
+varying vec2 v_texCoord;
+varying vec2 uv;
+uniform sampler2D u_image;
+uniform float u_brightness;
+uniform float u_contrast;
+uniform float u_saturation;
+uniform float u_enhance;
+uniform float u_grain;
+uniform float u_highlights;
+uniform float u_shadows;
+uniform float u_sharpen;
+uniform float u_warmth;
+uniform float u_vingette;
+uniform float u_fade;
+uniform vec2 u_textureSize; // New uniform for texture size
+
+mat4 saturationMatrix( float saturation )
+{
+    vec3 luminance = vec3( 0.3086, 0.6094, 0.0820 );
+    float oneMinusSat = 1.0 - saturation;
+    vec3 red = vec3( luminance.x * oneMinusSat );
+    red += vec3( saturation, 0, 0 );
+    vec3 green = vec3( luminance.y * oneMinusSat );
+    green += vec3( 0, saturation, 0 );
+    vec3 blue = vec3( luminance.z * oneMinusSat );
+    blue += vec3( 0, 0, saturation );
+    return mat4( red, 0,
+                 green, 0,
+                 blue, 0,
+                 0, 0, 0, 1 );
+}
+
+float rand(vec2 uv, float t) {
+    return fract(sin(dot(uv, vec2(1225.6548, 321.8942))) * 4251.4865 + t);
+}
+
+vec3 adjustHighlights(vec3 color, float highlights) {
+    float luminance = dot(color, vec3(0.3, 0.59, 0.11));
+    float factor = smoothstep(0.5, 1.0, luminance);
+    return mix(color, color + highlights * factor, factor);
+}
+
+vec3 adjustShadows(vec3 color, float shadows) {
+    float luminance = dot(color, vec3(0.3, 0.59, 0.11));
+    float factor = smoothstep(0.0, 0.5, luminance);
+    return mix(color, color - shadows * factor, factor);
+}
+
+float sdSquare(vec2 point, float width) {
+	vec2 d = abs(point) - width;
+	return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+vec4 vignette(vec4 color, vec2 uv, float vignette) {
+  float d = length(uv - 0.5) * -1.0;
+  vec4 overlay = vec4(d, d, d, vignette);
+
+  return mix(color, overlay, overlay.a);
+}
+
+vec3 applySharpen(vec2 uv, float sharpen, vec2 texel) {
+    mat3 kernel = mat3(
+        0.0, -1.0,  0.0,
+       -1.0,  5.0, -1.0,
+        0.0, -1.0,  0.0
+    );
+
+    vec3 result = vec3(0.0);
+    for(int i = -1; i <= 1; i++) {
+        for(int j = -1; j <= 1; j++) {
+            vec2 offset = vec2(float(i), float(j)) * texel;
+            result += texture2D(u_image, uv + offset).rgb * kernel[i+1][j+1];
+        }
+    }
+
+    vec3 original = texture2D(u_image, uv).rgb;
+    return mix(original, result, sharpen);
+}
+
+void main() {
+    vec4 color = texture2D(u_image, v_texCoord);
+
+    // apply Sharpen
+    vec2 texel = 1.0 / u_textureSize;
+    color.rgb = applySharpen(v_texCoord, u_sharpen, texel);
+
+    // Apply enhance
+    float contrast = 1.0 + u_enhance; // Increase contrast
+    float brightness = u_enhance * 30.0; // Increase brightness
+    float saturation = 1.0 + u_enhance; // Increase saturation
+    float r = color.r * 255.0;
+    float g = color.g * 255.0;
+    float b = color.b * 255.0;
+
+    r += brightness;
+    g += brightness;
+    b += brightness;
+
+    r = ((r - 128.0) * contrast) + 128.0;
+    g = ((g - 128.0) * contrast) + 128.0;
+    b = ((b - 128.0) * contrast) + 128.0;
+
+    float avg = 0.299 * r + 0.587 * g + 0.114 * b;
+    r = avg + (r - avg) * saturation;
+    g = avg + (g - avg) * saturation;
+    b = avg + (b - avg) * saturation;
+
+    color.r = max(0.0, min(255.0, r)) / 255.0;
+    color.g = max(0.0, min(255.0, g)) / 255.0;
+    color.b = max(0.0, min(255.0, b)) / 255.0;
+
+    // Apply brightness
+    color.rgb += u_brightness;
+
+    // Apply contrast
+    color.rgb = ((color.rgb - 0.5) * max(u_contrast + 1.0, 0.0)) + 0.5;
+
+    // Apply saturation
+    color = saturationMatrix(u_saturation + 1.0) * color;
+
+    // Apply highlights
+    color.rgb = adjustHighlights(color.rgb, u_highlights);
+
+    // Apply shadows
+    color.rgb = adjustShadows(color.rgb, u_shadows);
+
+    // Apply vignette
+    color = vignette(color, v_texCoord, u_vingette);
+
+    // Apply grain
+    float grain = rand(v_texCoord, u_grain);
+    color.rgb += grain * u_grain - (u_grain * 0.5);
+
+    // Aplly warmth
+    float value = -u_warmth / 5.0;
+    color.r = min(255.0, max(0.0, color.r - value));
+    color.b = min(255.0, max(0.0, color.b + value));
+
+    // Apply fade
+    color.rgb = mix(color.rgb, vec3(0.0, 0.0, 0.0), u_fade * 1.0);
+
+    gl_FragColor = color;
+}
+`;
+
+    function compileShader(gl: WebGLRenderingContext, source: string, type: number): WebGLShader | null {
+        const shader = gl.createShader(type);
+        if (!shader) return null;
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('Error compiling shader:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    function createProgram(gl: WebGLRenderingContext, vertexShaderSource: string, fragmentShaderSource: string): WebGLProgram | null {
+      const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+      const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+      if (!vertexShader || !fragmentShader) return null;
+      const program = gl.createProgram();
+      if (!program) return null;
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          console.error('Error linking program:', gl.getProgramInfoLog(program));
+          gl.deleteProgram(program);
+          return null;
+      }
+      return program;
+    }
+
+    props.program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+    if (!props.program) throw new Error('Failed to create program');
+
+    props.positionLocation = gl.getAttribLocation(props.program, 'a_position');
+    props.texCoordLocation = gl.getAttribLocation(props.program, 'a_texCoord');
+    props.brightnessLocation = gl.getUniformLocation(props.program, 'u_brightness');
+    props.contrastLocation = gl.getUniformLocation(props.program, 'u_contrast');
+    props.enhanceLocation = gl.getUniformLocation(props.program, 'u_enhance');
+    props.saturationLocation = gl.getUniformLocation(props.program, 'u_saturation');
+    props.warmthLocation = gl.getUniformLocation(props.program, 'u_warmth');
+    props.fadeLocation = gl.getUniformLocation(props.program, 'u_fade');
+    props.highlightsLocation = gl.getUniformLocation(props.program, 'u_highlights');
+    props.shadowsLocation = gl.getUniformLocation(props.program, 'u_shadows');
+    props.sharpenLocation = gl.getUniformLocation(props.program, 'u_sharpen');
+    props.vingetteLocation = gl.getUniformLocation(props.program, 'u_vingette');
+    props.grainLocation = gl.getUniformLocation(props.program, 'u_grain');
+    props.sharpenLocation = gl.getUniformLocation(props.program, 'u_sharpen');
+    props.textureSizeLocation = gl.getUniformLocation(props.program, "u_textureSize");
+
+
+    props.positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, props.positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,
+         1, -1,
+        -1,  1,
+         1,  1,
+    ]), gl.STATIC_DRAW);
+
+    props.texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, props.texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0, 0,
+        1, 0,
+        0, 1,
+        1, 1,
+    ]), gl.STATIC_DRAW);
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.sourceImage);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  }
+
   // * pipeline functions (in their order)
   private doEnhance() {
-    const ctx = this.properties.enhance.canvas.getContext('2d', {willReadFrequently: true});
-    const [width, height] = [this.sourceImage.width, this.sourceImage.height];
-    ctx.drawImage(this.sourceImage, 0, 0);
+    const props = this.properties.enhance;
+    const gl = this.properties.enhance.canvas.getContext('webgl');
 
-    const values = this.properties.enhance.values;
+    const values = props.values;
 
-    const enhance = () => {
-      const enhanceValue = values.Enhance / 4;
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT);
 
-      // Calculate the adjustment factors
-      const contrast = 1 + (enhanceValue / 100); // Increase contrast
-      const brightness = enhanceValue / 100 * 30; // Increase brightness
-      const saturation = 1 + (enhanceValue / 100); // Increase saturation
+    gl.useProgram(props.program);
 
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
+    gl.enableVertexAttribArray(props.positionLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, props.positionBuffer);
+    gl.vertexAttribPointer(props.positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-      // Iterate over each pixel
-      for(let i = 0; i < data.length; i += 4) {
-        // Get RGB values
-        let r = data[i];
-        let g = data[i + 1];
-        let b = data[i + 2];
+    gl.enableVertexAttribArray(props.texCoordLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, props.texCoordBuffer);
+    gl.vertexAttribPointer(props.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-        // Apply brightness
-        r += brightness;
-        g += brightness;
-        b += brightness;
+    gl.uniform1f(props.brightnessLocation, values.Brightness / 100);
+    gl.uniform1f(props.contrastLocation, values.Contrast / 100);
+    gl.uniform1f(props.saturationLocation, values.Saturation / 100);
+    gl.uniform1f(props.enhanceLocation, values.Enhance / 100);
+    gl.uniform1f(props.fadeLocation, values.Fade / 100);
+    gl.uniform1f(props.grainLocation, values.Grain / 100);
+    gl.uniform1f(props.highlightsLocation, values.Highlights / 100);
+    gl.uniform1f(props.shadowsLocation, values.Shadows / 100);
+    gl.uniform1f(props.sharpenLocation, values.Sharpen / 100 * 4);
+    gl.uniform1f(props.vingetteLocation, values.Vingette / 100);
+    gl.uniform1f(props.warmthLocation, values.Warmth / 100);
+    gl.uniform2f(props.textureSizeLocation, this.sourceImage.width, this.sourceImage.height);
 
-        // Apply contrast
-        r = ((r - 128) * contrast) + 128;
-        g = ((g - 128) * contrast) + 128;
-        b = ((b - 128) * contrast) + 128;
-
-        // Apply saturation
-        const avg = 0.299 * r + 0.587 * g + 0.114 * b;
-        r = avg + (r - avg) * saturation;
-        g = avg + (g - avg) * saturation;
-        b = avg + (b - avg) * saturation;
-
-        // Set new RGB values
-        data[i] = Math.max(0, Math.min(255, r));
-        data[i + 1] = Math.max(0, Math.min(255, g));
-        data[i + 2] = Math.max(0, Math.min(255, b));
-      }
-
-      // Put image data back onto the canvas
-      ctx.putImageData(imageData, 0, 0);
-    }
-
-    const brightness = () => {
-      ctx.filter = `brightness(${values.Brightness + 100}%)`;
-    }
-
-    const contrast = () => {
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const d = imgData.data;
-      const value = (values.Contrast/100) + 1;
-      var intercept = 128 * (1 - value);
-      for(var i = 0; i < d.length; i += 4) {
-        d[i] = d[i]*value + intercept;
-        d[i+1] = d[i+1]*value + intercept;
-        d[i+2] = d[i+2]*value + intercept;
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-
-    const saturation = () => {
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const dA = imageData.data; // raw pixel data in array
-
-      const sv = values.Saturation / 100 + 1; // saturation value. 0 = grayscale, 1 = original
-
-      const luR = 0.3086; // constant to determine luminance of red. Similarly, for green and blue
-      const luG = 0.6094;
-      const luB = 0.0820;
-
-      const az = (1 - sv)*luR + sv;
-      const bz = (1 - sv)*luG;
-      const cz = (1 - sv)*luB;
-      const dz = (1 - sv)*luR;
-      const ez = (1 - sv)*luG + sv;
-      const fz = (1 - sv)*luB;
-      const gz = (1 - sv)*luR;
-      const hz = (1 - sv)*luG;
-      const iz = (1 - sv)*luB + sv;
-
-      for(var i = 0; i < dA.length; i += 4) {
-        const red = dA[i]; // Extract original red color [0 to 255]. Similarly for green and blue below
-        const green = dA[i + 1];
-        const blue = dA[i + 2];
-
-        const saturatedRed = (az*red + bz*green + cz*blue);
-        const saturatedGreen = (dz*red + ez*green + fz*blue);
-        const saturateddBlue = (gz*red + hz*green + iz*blue);
-
-        dA[i] = saturatedRed;
-        dA[i + 1] = saturatedGreen;
-        dA[i + 2] = saturateddBlue;
-      }
-      ctx.putImageData(imageData, 0, 0);
-    }
-
-    const warmth = () => {
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const d = imgData.data;
-      const value = -values.Warmth / 5;
-      for(var i = 0; i < d.length; i += 4) {
-        d[i] = Math.min(255, Math.max(0, d[i] - value));
-        d[i+2] = Math.min(255, Math.max(0, d[i + 2] + value));
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-
-    const fade = () => {
-      ctx.rect(0, 0, width, height);
-      const value = values.Fade / 300;
-      ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
-      ctx.fill();
-    }
-
-    const highlightsAndShadows = () => {
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const d = imgData.data;
-      const highlights = values.Highlights / 500;
-      const shadows = -values.Shadows / 500;
-
-
-      const lumR = 0.00299;
-      const lumG = 0.00587;
-      const lumB = 0.00114;
-      for(var i = 0; i < d.length; i += 4) {
-        const luminance = lumR*d[i] + lumG*d[i+1] + lumB*d[i+2];
-        // console.log(luminance);
-        const h = highlights * (Math.pow(10.0, luminance) - 1.0);
-        const s = shadows * 10 * (Math.pow(10.0, 1.2 - luminance) - 1.0);
-        d[i] += h + s;
-        d[i+1] += h + s;
-        d[i+2] += h + s;
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-
-    const vingette = () => {
-      var outerRadius = width * .6;
-      var innerRadius = width * .05;
-      var grd = ctx.createRadialGradient(width / 2, height / 2, innerRadius, width / 2, height / 2, outerRadius);
-      // light blue
-      grd.addColorStop(0, 'rgba(0,0,0,0)');
-      // dark blue
-      grd.addColorStop(1, 'rgba(0,0,0,' + values.Vingette / 150 + ')');
-
-      ctx.fillStyle = grd;
-      ctx.fill();
-    }
-
-    const grain = () => {
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const d = imgData.data;
-      const amount = values.Grain / 5;
-
-      for(var i = 0; i < d.length; i += 4) {
-        const grainAmount = (1 - Math.random() * 2) * amount;
-        d[i] += grainAmount;
-        d[i+1] += grainAmount;
-        d[i+2] += grainAmount;
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-
-    const sharpen = () => {
-      const h = height;
-      const w = width;
-      const mix = values.Sharpen / 50;
-      var x, sx, sy, r, g, b, a, dstOff, srcOff, wt, cx, cy, scy, scx,
-        weights = [0, -1, 0, -1, 5, -1, 0, -1, 0],
-        katet = Math.round(Math.sqrt(weights.length)),
-        half = (katet * 0.5) | 0,
-        dstData = ctx.createImageData(w, h),
-        dstBuff = dstData.data,
-        srcBuff = ctx.getImageData(0, 0, w, h).data,
-        y = h;
-
-      while(y--) {
-        x = w;
-        while(x--) {
-          sy = y;
-          sx = x;
-          dstOff = (y * w + x) * 4;
-          r = 0;
-          g = 0;
-          b = 0;
-          a = 0;
-
-          for(cy = 0; cy < katet; cy++) {
-            for(cx = 0; cx < katet; cx++) {
-              scy = sy + cy - half;
-              scx = sx + cx - half;
-
-              if(scy >= 0 && scy < h && scx >= 0 && scx < w) {
-                srcOff = (scy * w + scx) * 4;
-                wt = weights[cy * katet + cx];
-
-                r += srcBuff[srcOff] * wt;
-                g += srcBuff[srcOff + 1] * wt;
-                b += srcBuff[srcOff + 2] * wt;
-                a += srcBuff[srcOff + 3] * wt;
-              }
-            }
-          }
-          dstBuff[dstOff] = r * mix + srcBuff[dstOff] * (1 - mix);
-          dstBuff[dstOff + 1] = g * mix + srcBuff[dstOff + 1] * (1 - mix);
-          dstBuff[dstOff + 2] = b * mix + srcBuff[dstOff + 2] * (1 - mix);
-          dstBuff[dstOff + 3] = srcBuff[dstOff + 3];
-        }
-      }
-
-      ctx.putImageData(dstData, 0, 0);
-    }
-
-    // apply all effects in specific order
-    enhance();
-    contrast();
-    brightness();
-    saturation();
-    warmth();
-    highlightsAndShadows();
-    fade();
-    vingette();
-    sharpen();
-    grain();
-
-    // next pipeline state
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     this.doCrop();
   }
 

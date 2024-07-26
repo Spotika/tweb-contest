@@ -236,7 +236,8 @@
       justify-content: space-between;
       margin-bottom: 22px;
       .effect-container-title {
-        font-size: 18px;
+        font-size: 16px;
+        line-height: 20px;
       }
 
       .effect-container-value {
@@ -495,6 +496,7 @@
 
 .editor-panel-content-text {
   padding: 16px 8px;
+  font-family: 'AmericanTypewriter', serif;
   .size-select-wrapper {
     display: flex;
     flex-direction: column;
