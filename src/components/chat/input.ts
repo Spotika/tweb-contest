@@ -529,7 +529,7 @@ export default class ChatInput {
       danger: true
     }];
     const btnMenu = this.replyElements.menuContainer = ButtonMenuSync({
-      buttons,
+      buttons: [buttons],
       listenerSetter: this.listenerSetter
     });
 
@@ -589,7 +589,7 @@ export default class ChatInput {
       }
     ];
     const forwardBtnMenu = forwardElements.container = ButtonMenuSync({
-      buttons: forwardButtons,
+      buttons: [forwardButtons],
       radioGroups: [{
         name: 'author',
         onChange: (value) => {
@@ -661,7 +661,7 @@ export default class ChatInput {
       danger: true
     }];
     const btnMenu = this.webPageElements.container = ButtonMenuSync({
-      buttons,
+      buttons: [buttons],
       radioGroups: [{
         name: 'position',
         onChange: (value) => {

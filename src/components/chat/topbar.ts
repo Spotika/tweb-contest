@@ -13,7 +13,7 @@ import {IS_SAFARI} from '../../environment/userAgent';
 import rootScope, {BroadcastEvents} from '../../lib/rootScope';
 import Button, {replaceButtonIcon} from '../button';
 import ButtonIcon from '../buttonIcon';
-import ButtonMenuToggle from '../buttonMenuToggle';
+import ButtonMenuToggle, {areButtonsGrouped} from '../buttonMenuToggle';
 import ChatAudio from './audio';
 import ChatPinnedMessage from './pinnedMessage';
 import ListenerSetter from '../../helpers/listenerSetter';
@@ -181,8 +181,12 @@ export default class ChatTopbar {
         direction: 'bottom-left',
         buttons: this.menuButtons,
         onOpen: async(e, element) => {
-          const deleteButton = this.menuButtons[this.menuButtons.length - 1];
-          if(deleteButton?.element) {
+          if(!areButtonsGrouped(this.menuButtons)) {
+            this.menuButtons = [this.menuButtons];
+          }
+          const lastGroup = this.menuButtons[this.menuButtons.length - 1];
+          const deleteButton =  lastGroup[lastGroup.length - 1];
+          if(!deleteButton?.element) {
             const deleteButtonText = await this.managers.appPeersManager.getDeleteButtonText(this.peerId);
             deleteButton.element.lastChild.replaceWith(i18n(deleteButtonText));
           }
@@ -322,6 +326,7 @@ export default class ChatTopbar {
     const isMenuOpen = !!e || !!(this.btnMore && this.btnMore.classList.contains('menu-open'));
 
     e && cancelEvent(e);
+    console.warn(this.buttonsToVerify)
 
     const r = async() => {
       const buttons = this.buttonsToVerify.concat(isMenuOpen ? this.menuButtons as any : []);

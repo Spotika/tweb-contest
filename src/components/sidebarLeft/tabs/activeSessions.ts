@@ -132,11 +132,11 @@ export default class AppActiveSessionsTab extends SliderSuperTabEventable {
     };
 
     const element = this.menuElement = ButtonMenuSync({
-      buttons: [{
+      buttons: [[{
         icon: 'stop',
         text: 'Terminate',
         onClick: onTerminateClick
-      }]
+      }]]
     });
     element.id = 'active-sessions-contextmenu';
     element.classList.add('contextmenu');

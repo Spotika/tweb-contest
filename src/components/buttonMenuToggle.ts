@@ -51,6 +51,10 @@ export function ButtonMenuToggleHandler({
   });
 }
 
+export const areButtonsGrouped = (buttons: ButtonMenuItemOptionsVerifiable[] | ButtonMenuItemOptionsVerifiable[][]): buttons is ButtonMenuItemOptionsVerifiable[][] => {
+  return buttons.length && Array.isArray(buttons[0]);
+}
+
 export default function ButtonMenuToggle({
   buttonOptions,
   listenerSetter: attachListenerSetter,
@@ -68,7 +72,7 @@ export default function ButtonMenuToggle({
   listenerSetter?: ListenerSetter,
   container?: HTMLElement
   direction: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right',
-  buttons: ButtonMenuItemOptionsVerifiable[],
+  buttons: ButtonMenuItemOptionsVerifiable[] | ButtonMenuItemOptionsVerifiable[][],
   onOpenBefore?: (e: Event) => any,
   onOpen?: (e: Event, element: HTMLElement) => any,
   onClose?: () => void,
@@ -90,6 +94,10 @@ export default function ButtonMenuToggle({
     closeTimeout = undefined;
   };
 
+  if(!areButtonsGrouped(buttons)) {
+    buttons = [buttons] satisfies ButtonMenuItemOptionsVerifiable[][] as ButtonMenuItemOptionsVerifiable[][];
+  }
+
   let element: HTMLElement, closeTimeout: number, tempId = 0;
   ButtonMenuToggleHandler({
     el: button,
@@ -101,10 +109,13 @@ export default function ButtonMenuToggle({
         clearCloseTimeout();
         return;
       }
+      console.warn(areButtonsGrouped(buttons), buttons)
+      for(let i = 0; i < buttons.length; ++i) {
+        console.log(i);
+        buttons[i] = await filterAsync(buttons[i], (button) => button.verify ? button.verify() ?? false : true);
+      }
 
-      const f = (b: (typeof buttons[0])[]) => filterAsync(b, (button) => button?.verify ? button.verify() ?? false : true);
-
-      const filteredButtons = await f(buttons);
+      const filteredButtons = buttons.filter((buttonsRow) => !!buttonsRow)
       if(_tempId !== tempId) return;
       if(!filteredButtons.length) {
         return;
@@ -138,7 +149,11 @@ export default function ButtonMenuToggle({
         onCloseAfter?.();
         closeTimeout = undefined;
         listenerSetter.removeAll();
-        buttons.forEach((button) => button.element = undefined);
+        buttons.forEach((buttonsGroup) => {
+          buttonsGroup.forEach((button) => {
+            button.element = undefined;
+          })
+        });
         element.remove();
       }, 300);
     }

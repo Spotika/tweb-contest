@@ -181,7 +181,7 @@ export default class ChatSendAs {
     });
 
     const buttons = await Promise.all(promises);
-    const btnMenu = ButtonMenuSync({buttons}/* , this.listenerSetter */);
+    const btnMenu = ButtonMenuSync({buttons: [buttons]}/* , this.listenerSetter */);
     buttons.forEach((button, idx) => {
       const {peerId} = peers[idx];
       const avatar = avatarNew({

@@ -55,7 +55,7 @@ export const PlaybackRateButton = (options: {
 
   const setBtnMenuToggle = () => {
     const buttons = PLAYBACK_RATES.map((rate, idx) => {
-      const buttonOptions: Parameters<typeof ButtonMenuSync>[0]['buttons'][0] = {
+      const buttonOptions: Parameters<typeof ButtonMenuSync>[0]['buttons'][0][0] = {
         // icon: PLAYBACK_RATES_ICONS[idx],
         regularText: rate + 'x',
         onClick: () => {
@@ -63,7 +63,7 @@ export const PlaybackRateButton = (options: {
         }
       };
 
-      return buttonOptions;
+      return [buttonOptions];
     });
     const btnMenu = ButtonMenuSync({buttons});
     btnMenu.classList.add(options.direction, 'playback-rate-menu');

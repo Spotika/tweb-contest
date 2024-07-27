@@ -96,12 +96,12 @@ export default class AppBlockedUsersTab extends SliderSuperTab {
     };
 
     const element = this.menuElement = ButtonMenuSync({
-      buttons: [{
+      buttons: [[{
         icon: 'lockoff',
         text: 'Unblock',
         onClick: onUnblock,
         options: {listenerSetter: this.listenerSetter}
-      }]
+      }]]
     });
     element.id = 'blocked-users-contextmenu';
     element.classList.add('contextmenu');

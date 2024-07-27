@@ -949,7 +949,7 @@ export default class ChatContextMenu {
     }
 
     const element = this.element = await ButtonMenu({
-      buttons: filteredButtons,
+      buttons: [filteredButtons],
       listenerSetter: this.listenerSetter
     });
     element.id = 'bubble-contextmenu';

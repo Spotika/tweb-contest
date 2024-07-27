@@ -156,7 +156,7 @@ export class AppSidebarLeft extends SidebarSlider {
       themeCheckboxField.setValueSilently(themeController.getTheme().name === 'night');
     });
 
-    const menuButtons: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
+    const menuButtonsContent: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'savedmessages',
       text: 'SavedMessages',
       onClick: () => {
@@ -183,13 +183,23 @@ export class AppSidebarLeft extends SidebarSlider {
       onClick: () => {
         this.createTab(AppPeopleNearbyTab).open();
       }
-    } : undefined, {
+    } : undefined];
+
+    const menuButtonsSettings: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'settings',
       text: 'Settings',
       onClick: () => {
         this.createTab(AppSettingsTab).open();
       }
     }, {
+      icon: 'more',
+      text: 'More',
+      onClick: () => {
+        this.createTab(AppSettingsTab).open();
+      }
+    }];
+
+    const menuButtonsSubmenu: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'darkmode',
       text: 'DarkMode',
       onClick: () => {
@@ -249,16 +259,7 @@ export class AppSidebarLeft extends SidebarSlider {
         });
       },
       verify: () => App.isMainDomain
-    }, /* {
-      icon: 'char w',
-      text: 'ChatList.Menu.SwitchTo.Webogram',
-      onClick: () => {
-        sessionStorage.delete('tgme_sync').then(() => {
-          location.href = 'https://web.telegram.org/?legacy=1';
-        });
-      },
-      verify: () => App.isMainDomain
-    }, */ {
+    }, {
       icon: 'plusround',
       text: 'PWA.Install',
       onClick: () => {
@@ -268,7 +269,11 @@ export class AppSidebarLeft extends SidebarSlider {
       verify: () => !!getInstallPrompt()
     }];
 
-    const filteredButtons = menuButtons.filter(Boolean);
+    const filteredButtons = [
+      menuButtonsContent.filter(Boolean),
+      menuButtonsSettings.filter(Boolean),
+      menuButtonsSubmenu.filter(Boolean)
+    ];
     const filteredButtonsSliced = filteredButtons.slice();
     this.toolsBtn = ButtonMenuToggle({
       direction: 'bottom-right',
@@ -280,7 +285,8 @@ export class AppSidebarLeft extends SidebarSlider {
           return attachMenuBot.pFlags.show_in_side_menu;
         }).map((attachMenuBot) => {
           const icon = getAttachMenuBotIcon(attachMenuBot);
-          const button: typeof buttons[0] = {
+          alert((attachMenuBot.short_name));
+          const button: typeof buttons[0][0] = {
             regularText: wrapEmojiText(attachMenuBot.short_name),
             onClick: () => {
               appImManager.openWebApp({
@@ -297,7 +303,7 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
-        buttons.splice(3, 0, ...attachMenuBotsButtons);
+        buttons.splice(2, 0, attachMenuBotsButtons);
         filteredButtons.splice(0, filteredButtons.length, ...buttons);
       },
       onOpen: (e, btnMenu) => {

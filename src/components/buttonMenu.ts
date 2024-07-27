@@ -176,7 +176,7 @@ function ButtonMenuItem(options: ButtonMenuItemOptions) {
 }
 
 export function ButtonMenuSync({listenerSetter, buttons, radioGroups}: {
-  buttons: ButtonMenuItemOptions[],
+  buttons: ButtonMenuItemOptions[][],
   radioGroups?: {
     name: string,
     onChange: (value: string, e: Event) => any,
@@ -188,27 +188,38 @@ export function ButtonMenuSync({listenerSetter, buttons, radioGroups}: {
   el.classList.add('btn-menu');
 
   if(radioGroups) {
-    buttons.forEach((b) => {
-      if(!b.radioGroup) {
-        return;
-      }
+    buttons.forEach((buttonsGroup) => {
+      buttonsGroup.forEach((b) => {
+        if(!b.radioGroup) {
+          return;
+        }
 
-      b.checkboxField ??= new CheckboxField();
+        b.checkboxField ??= new CheckboxField();
+      });
     });
   }
 
   if(listenerSetter) {
-    buttons.forEach((b) => {
-      (b.options ??= {}).listenerSetter = listenerSetter;
+    buttons.forEach((buttonsGroup) => {
+      buttonsGroup.forEach((b) => (b.options ??= {}).listenerSetter = listenerSetter);
     });
   }
 
-  const items = buttons.map(ButtonMenuItem);
-  el.append(...flatten(items));
+  const items = buttons.map((buttonsGroup) => {
+    const group = document.createElement('div');
+    const groupItems = buttonsGroup.map((button) => ButtonMenuItem(button));
+    group.append(...flatten(groupItems));
+    return group;
+  });
+  el.append(...items);
 
   if(radioGroups) {
     radioGroups.forEach((group) => {
-      const elements = buttons.filter((button) => button.radioGroup === group.name);
+      const elements = flatten(
+        buttons.map((buttonsGroup) => {
+          return buttonsGroup.filter((button) => button.radioGroup === group.name);
+        })
+      );
 
       const hr = document.createElement('hr');
       elements[0].element.replaceWith(hr);
@@ -235,6 +246,8 @@ export function ButtonMenuSync({listenerSetter, buttons, radioGroups}: {
 
 export default async function ButtonMenu(options: Parameters<typeof ButtonMenuSync>[0]) {
   const el = ButtonMenuSync(options);
-  await Promise.all(options.buttons.map(({loadPromise}) => loadPromise));
+  await Promise.all(flatten(
+    options.buttons.map((buttonsGroup) => buttonsGroup.map(({loadPromise}) => loadPromise))
+  ));
   return el;
 }
