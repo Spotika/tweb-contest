@@ -109,9 +109,8 @@ export default function ButtonMenuToggle({
         clearCloseTimeout();
         return;
       }
-      console.warn(areButtonsGrouped(buttons), buttons)
+      // console.warn(areButtonsGrouped(buttons), buttons)
       for(let i = 0; i < buttons.length; ++i) {
-        console.log(i);
         buttons[i] = await filterAsync(buttons[i], (button) => button.verify ? button.verify() ?? false : true);
       }
 

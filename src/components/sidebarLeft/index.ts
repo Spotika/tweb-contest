@@ -125,7 +125,7 @@ export class AppSidebarLeft extends SidebarSlider {
     // this.toolsBtn = this.sidebarEl.querySelector('.sidebar-tools-button') as HTMLButtonElement;
     this.backBtn = this.sidebarEl.querySelector('.sidebar-back-button') as HTMLButtonElement;
 
-    const btnArchive: typeof menuButtons[0] = {
+    const btnArchive: typeof menuButtonsSettings[0] = {
       icon: 'archive',
       text: 'ArchivedChats',
       onClick: () => {
@@ -285,7 +285,6 @@ export class AppSidebarLeft extends SidebarSlider {
           return attachMenuBot.pFlags.show_in_side_menu;
         }).map((attachMenuBot) => {
           const icon = getAttachMenuBotIcon(attachMenuBot);
-          alert((attachMenuBot.short_name));
           const button: typeof buttons[0][0] = {
             regularText: wrapEmojiText(attachMenuBot.short_name),
             onClick: () => {
