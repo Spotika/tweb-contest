@@ -185,19 +185,21 @@ export class AppSidebarLeft extends SidebarSlider {
       }
     } : undefined];
 
+    const btnMore: typeof menuButtonsContent[0] = {
+      icon: 'more',
+      text: 'More',
+      onClick: () => {
+        this.createTab(AppSettingsTab).open();
+      }
+    };
+
     const menuButtonsSettings: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'settings',
       text: 'Settings',
       onClick: () => {
         this.createTab(AppSettingsTab).open();
       }
-    }, {
-      icon: 'more',
-      text: 'More',
-      onClick: () => {
-        this.createTab(AppSettingsTab).open();
-      }
-    }];
+    }, btnMore];
 
     const menuButtonsSubmenu: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'darkmode',
@@ -325,6 +327,10 @@ export class AppSidebarLeft extends SidebarSlider {
         if(a) a.textContent = 'A';
 
         btnArchive.element?.append(this.archivedCount);
+
+        const iconSubmenu = Icon('arrowhead');
+        iconSubmenu.classList.add('btn-menu-icon-arrow');
+        btnMore.element?.append(iconSubmenu);
       },
       noIcon: true
     });
