@@ -207,7 +207,7 @@ export function ButtonMenuSync({listenerSetter, buttons, radioGroups}: {
 
   const items = buttons.map((buttonsGroup) => {
     const group = document.createElement('div');
-    group.classList.add('btn-menu-group')
+    if(buttons.length > 1) group.classList.add('btn-menu-group');
     const groupItems = buttonsGroup.map((button) => ButtonMenuItem(button));
     group.append(...flatten(groupItems));
     return group;
