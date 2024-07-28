@@ -97,7 +97,7 @@ export class GroupCallParticipantContextMenu {
     this.instance = options.instance;
     this.chatId = this.instance.chatId;
 
-    this.element = ButtonMenuSync({buttons: this.buttons, listenerSetter});
+    this.element = ButtonMenuSync({buttons: [this.buttons], listenerSetter});
     this.element.classList.add('group-call-participant-menu', 'night');
 
     attachContextMenuListener({

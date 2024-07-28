@@ -83,7 +83,7 @@ export default class SendMenu {
 
     this.createButtons();
     const buttons = this.createButtons();
-    const element = ButtonMenuSync({buttons, listenerSetter});
+    const element = ButtonMenuSync({buttons: [buttons], listenerSetter});
     element.classList.add('menu-send', this.options.openSide);
     this.options.onRef(element);
 

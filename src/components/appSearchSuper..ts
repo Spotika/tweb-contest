@@ -301,7 +301,7 @@ class SearchContextMenu {
       withSelection: true
     }];
 
-    this.element = ButtonMenuSync({buttons: this.buttons, listenerSetter: this.listenerSetter});
+    this.element = ButtonMenuSync({buttons: [this.buttons], listenerSetter: this.listenerSetter});
     this.element.classList.add('search-contextmenu', 'contextmenu');
     document.getElementById('page-chats').append(this.element);
   }

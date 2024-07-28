@@ -73,6 +73,9 @@ import wrapEmojiStatus from '../wrappers/emojiStatus';
 import {makeMediaSize} from '../../helpers/mediaSize';
 import ReactionElement from '../chat/reaction';
 import setBlankToAnchor from '../../lib/richTextProcessor/setBlankToAnchor';
+import {AvatarNew} from '../avatarNew';
+import {addUserToIndexedDB, dropLocalAccount, getAllUsersFromIndexedDB, switchToAccount} from '../../lib/files/idb';
+import wrapPeerTitle from '../wrappers/peerTitle';
 
 export const LEFT_COLUMN_ACTIVE_CLASSNAME = 'is-left-column-shown';
 
@@ -125,7 +128,7 @@ export class AppSidebarLeft extends SidebarSlider {
     // this.toolsBtn = this.sidebarEl.querySelector('.sidebar-tools-button') as HTMLButtonElement;
     this.backBtn = this.sidebarEl.querySelector('.sidebar-back-button') as HTMLButtonElement;
 
-    const btnArchive: typeof menuButtons[0] = {
+    const btnArchive: typeof menuButtonsSettings[0] = {
       icon: 'archive',
       text: 'ArchivedChats',
       onClick: () => {
@@ -155,8 +158,13 @@ export class AppSidebarLeft extends SidebarSlider {
     rootScope.addEventListener('theme_changed', () => {
       themeCheckboxField.setValueSilently(themeController.getTheme().name === 'night');
     });
+    const currentUserId = JSON.parse(localStorage.getItem('user_auth'))?.id as number | undefined;
+    wrapPeerTitle({peerId: currentUserId, meAsNotes: false}).then((node) => {
+      const userName = node.innerText;
+      addUserToIndexedDB(currentUserId, userName);
+    });
 
-    const menuButtons: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
+    const menuButtonsContent: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'savedmessages',
       text: 'SavedMessages',
       onClick: () => {
@@ -183,13 +191,25 @@ export class AppSidebarLeft extends SidebarSlider {
       onClick: () => {
         this.createTab(AppPeopleNearbyTab).open();
       }
-    } : undefined, {
+    } : undefined];
+
+    const btnMore: typeof menuButtonsContent[0] = {
+      icon: 'more',
+      text: 'More',
+      onClick: () => {
+        this.createTab(AppSettingsTab).open();
+      }
+    };
+
+    const menuButtonsSettings: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'settings',
       text: 'Settings',
       onClick: () => {
         this.createTab(AppSettingsTab).open();
       }
-    }, {
+    }, btnMore];
+
+    const menuButtonsSubmenu: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
       icon: 'darkmode',
       text: 'DarkMode',
       onClick: () => {
@@ -249,16 +269,7 @@ export class AppSidebarLeft extends SidebarSlider {
         });
       },
       verify: () => App.isMainDomain
-    }, /* {
-      icon: 'char w',
-      text: 'ChatList.Menu.SwitchTo.Webogram',
-      onClick: () => {
-        sessionStorage.delete('tgme_sync').then(() => {
-          location.href = 'https://web.telegram.org/?legacy=1';
-        });
-      },
-      verify: () => App.isMainDomain
-    }, */ {
+    }, {
       icon: 'plusround',
       text: 'PWA.Install',
       onClick: () => {
@@ -268,19 +279,24 @@ export class AppSidebarLeft extends SidebarSlider {
       verify: () => !!getInstallPrompt()
     }];
 
-    const filteredButtons = menuButtons.filter(Boolean);
+    const filteredButtons = [
+      menuButtonsContent.filter(Boolean),
+      menuButtonsSettings.filter(Boolean),
+      menuButtonsSubmenu.filter(Boolean)
+    ];
     const filteredButtonsSliced = filteredButtons.slice();
     this.toolsBtn = ButtonMenuToggle({
       direction: 'bottom-right',
       buttons: filteredButtons,
       onOpenBefore: async() => {
         const attachMenuBots = await this.managers.appAttachMenuBotsManager.getAttachMenuBots();
+        const userButtons = await this.getUsersMenuButtons();
         const buttons = filteredButtonsSliced.slice();
         const attachMenuBotsButtons = attachMenuBots.filter((attachMenuBot) => {
           return attachMenuBot.pFlags.show_in_side_menu;
         }).map((attachMenuBot) => {
           const icon = getAttachMenuBotIcon(attachMenuBot);
-          const button: typeof buttons[0] = {
+          const button: typeof buttons[0][0] = {
             regularText: wrapEmojiText(attachMenuBot.short_name),
             onClick: () => {
               appImManager.openWebApp({
@@ -297,7 +313,8 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
-        buttons.splice(3, 0, ...attachMenuBotsButtons);
+        buttons.splice(0, 0, userButtons);
+        buttons.splice(2, 0, attachMenuBotsButtons);
         filteredButtons.splice(0, filteredButtons.length, ...buttons);
       },
       onOpen: (e, btnMenu) => {
@@ -320,6 +337,10 @@ export class AppSidebarLeft extends SidebarSlider {
         if(a) a.textContent = 'A';
 
         btnArchive.element?.append(this.archivedCount);
+
+        const iconSubmenu = Icon('arrowhead');
+        iconSubmenu.classList.add('btn-menu-icon-arrow');
+        btnMore.element?.append(iconSubmenu);
       },
       noIcon: true
     });
@@ -912,6 +933,48 @@ export class AppSidebarLeft extends SidebarSlider {
         });
       });
     });
+  }
+
+  private async getUsersMenuButtons(): Promise<ButtonMenuItemOptions[]> {
+    const result: ButtonMenuItemOptions[] = [];
+    const currentUserId = rootScope.myId.toUserId() as number;
+    const users = await getAllUsersFromIndexedDB();
+
+    // keep current account always on the top
+    users.sort((a, b) => a.userId === currentUserId ? -1 : 1);
+
+    for(const user of users) {
+      const avatar = AvatarNew({
+        isBig: false,
+        size: 20,
+        peerId: user.userId as number
+      });
+
+      const userNameSpan = document.createElement('span');
+      userNameSpan.innerText = user.name.trim();
+
+      result.push({
+        iconElement: avatar.element as HTMLElement,
+        textElement: userNameSpan,
+        onClick: () => {
+          if(user.userId === currentUserId) {
+            return;
+          }
+
+          switchToAccount(user.userId).then(() => location.reload())
+        }
+      });
+    }
+
+    result.push({
+      icon: 'plus',
+      text: 'AddAccount',
+      onClick: () => {
+        dropLocalAccount().then(() => location.reload())
+      }
+    })
+
+    return result;
   }
 }
 

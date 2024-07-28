@@ -14,7 +14,7 @@ import DATABASE_STATE from '../../config/databases/state';
 import {NOTIFICATION_BADGE_PATH, NOTIFICATION_ICON_PATH} from '../../config/notifications';
 import {IS_FIREFOX} from '../../environment/userAgent';
 import deepEqual from '../../helpers/object/deepEqual';
-import IDBStorage from '../files/idb';
+import {IDBStorage} from '../files/idb';
 import {log, serviceMessagePort} from './index.service';
 import {ServicePushPingTaskPayload} from './serviceMessagePort';
 
