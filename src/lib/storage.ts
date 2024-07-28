@@ -16,7 +16,7 @@ import deferredPromise, {CancellablePromise} from '../helpers/cancellablePromise
 import {IS_WORKER} from '../helpers/context';
 import throttle from '../helpers/schedulers/throttle';
 // import { WorkerTaskTemplate } from "../types";
-import IDBStorage from './files/idb';
+import {IDBStorage} from './files/idb';
 
 function noop() {}
 
@@ -64,7 +64,8 @@ export default class AppStorage<
   private deleteDeferred = deferredPromise<void>();
 
   constructor(private db: T, private storeName: typeof db['stores'][number]['name']) {
-    console.warn('difhel', { db, storeName })
+    // console.warn('difhel', { db, storeName })
+    console.log(IDBStorage)
     this.storage = new IDBStorage<T>(db, storeName);
 
     if(AppStorage.STORAGES.length) {

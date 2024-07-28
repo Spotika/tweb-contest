@@ -73,6 +73,9 @@ import wrapEmojiStatus from '../wrappers/emojiStatus';
 import {makeMediaSize} from '../../helpers/mediaSize';
 import ReactionElement from '../chat/reaction';
 import setBlankToAnchor from '../../lib/richTextProcessor/setBlankToAnchor';
+import {AvatarNew} from '../avatarNew';
+import {addUserToIndexedDB, dropLocalAccount, getAllUsersFromIndexedDB, switchToAccount} from '../../lib/files/idb';
+import wrapPeerTitle from '../wrappers/peerTitle';
 
 export const LEFT_COLUMN_ACTIVE_CLASSNAME = 'is-left-column-shown';
 
@@ -154,6 +157,11 @@ export class AppSidebarLeft extends SidebarSlider {
 
     rootScope.addEventListener('theme_changed', () => {
       themeCheckboxField.setValueSilently(themeController.getTheme().name === 'night');
+    });
+    const currentUserId = JSON.parse(localStorage.getItem('user_auth'))?.id as number | undefined;
+    wrapPeerTitle({peerId: currentUserId, meAsNotes: false}).then((node) => {
+      const userName = node.innerText;
+      addUserToIndexedDB(currentUserId, userName);
     });
 
     const menuButtonsContent: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
@@ -282,6 +290,7 @@ export class AppSidebarLeft extends SidebarSlider {
       buttons: filteredButtons,
       onOpenBefore: async() => {
         const attachMenuBots = await this.managers.appAttachMenuBotsManager.getAttachMenuBots();
+        const userButtons = await this.getUsersMenuButtons();
         const buttons = filteredButtonsSliced.slice();
         const attachMenuBotsButtons = attachMenuBots.filter((attachMenuBot) => {
           return attachMenuBot.pFlags.show_in_side_menu;
@@ -304,6 +313,7 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
+        buttons.splice(0, 0, userButtons);
         buttons.splice(2, 0, attachMenuBotsButtons);
         filteredButtons.splice(0, filteredButtons.length, ...buttons);
       },
@@ -923,6 +933,48 @@ export class AppSidebarLeft extends SidebarSlider {
         });
       });
     });
+  }
+
+  private async getUsersMenuButtons(): Promise<ButtonMenuItemOptions[]> {
+    const result: ButtonMenuItemOptions[] = [];
+    const currentUserId = rootScope.myId.toUserId() as number;
+    const users = await getAllUsersFromIndexedDB();
+
+    // keep current account always on the top
+    users.sort((a, b) => a.userId === currentUserId ? -1 : 1);
+
+    for(const user of users) {
+      const avatar = AvatarNew({
+        isBig: false,
+        size: 20,
+        peerId: user.userId as number
+      });
+
+      const userNameSpan = document.createElement('span');
+      userNameSpan.innerText = user.name.trim();
+
+      result.push({
+        iconElement: avatar.element as HTMLElement,
+        textElement: userNameSpan,
+        onClick: () => {
+          if(user.userId === currentUserId) {
+            return;
+          }
+
+          switchToAccount(user.userId).then(() => location.reload())
+        }
+      });
+    }
+
+    result.push({
+      icon: 'plus',
+      text: 'AddAccount',
+      onClick: () => {
+        dropLocalAccount().then(() => location.reload())
+      }
+    })
+
+    return result;
   }
 }
 

@@ -23,6 +23,7 @@ import wrapAttachBotIcon from './wrappers/attachBotIcon';
 type ButtonMenuItemInner = Omit<Parameters<typeof ButtonMenuSync>[0], 'listenerSetter'>;
 export type ButtonMenuItemOptions = {
   icon?: Icon,
+  iconElement?: HTMLElement,
   iconDoc?: Document.document,
   danger?: boolean,
   new?: boolean,
@@ -70,6 +71,11 @@ function ButtonMenuItem(options: ButtonMenuItemOptions) {
 
   if(iconSplitted) {
     el.append(Icon(iconSplitted[0] as Icon, 'btn-menu-item-icon'));
+  }
+
+  if(options.iconElement) {
+    options.iconElement.classList.add('btn-menu-item-icon');
+    el.append(options.iconElement);
   }
 
   let textElement = options.textElement;

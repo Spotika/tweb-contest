@@ -2845,7 +2845,8 @@ const lang = {
     'one_value': 'Subscribe to [Telegram Premium]() to increase upload speeds %d time.',
     'other_value': 'Subscribe to [Telegram Premium]() to increase upload speeds %d times.'
   },
-  'More': 'More'
+  'More': 'More',
+  'AddAccount': 'Add Account'
 };
 
 export default lang;
