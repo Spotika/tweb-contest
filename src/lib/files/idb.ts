@@ -531,3 +531,223 @@ export default class IDBStorage<T extends Database<any>, StoreName extends strin
     return Promise.resolve(fakeWriter);
   } */
 }
+
+export async function exportIndexedDBToJSON(dbName: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName);
+
+    request.onsuccess = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const exportObject: { [storeName: string]: { key: any, value: any }[] } = {};
+      const transaction = db.transaction(db.objectStoreNames as unknown as string[], 'readonly');
+
+      transaction.oncomplete = () => {
+        resolve(JSON.stringify(exportObject));
+      };
+
+      transaction.onerror = (event) => {
+        reject(transaction.error);
+      };
+
+      for(const storeName of db.objectStoreNames as unknown as string[]) {
+        const store = transaction.objectStore(storeName);
+        const storeRequest = store.openCursor();
+
+        exportObject[storeName] = [];
+
+        storeRequest.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if(cursor) {
+            exportObject[storeName].push({key: cursor.key, value: cursor.value});
+            cursor.continue();
+          }
+        };
+
+        storeRequest.onerror = (event) => {
+          reject(storeRequest.error);
+        };
+      }
+    };
+
+    request.onerror = (event) => {
+      reject(request.error);
+    };
+  });
+}
+
+export async function importJSONToIndexedDB(jsonData: string, dbName: string): Promise<void> {
+  const data = JSON.parse(jsonData);
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 7);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+
+      for(const storeName in data) {
+        if(!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName);
+        }
+      }
+    };
+
+    request.onsuccess = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const transaction = db.transaction(Object.keys(data), 'readwrite');
+
+      transaction.oncomplete = () => {
+        resolve();
+      };
+
+      transaction.onerror = (event) => {
+        reject(transaction.error);
+      };
+
+      for(const storeName in data) {
+        const store = transaction.objectStore(storeName);
+
+        for(const record of data[storeName]) {
+          store.put(record.value, record.key);
+        }
+      }
+    };
+
+    request.onerror = (event) => {
+      reject(request.error);
+    };
+  });
+}
+
+export function exportLocalStorage(): string {
+  const localStorageObject: { [key: string]: string } = {};
+  for(let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if(key) {
+      localStorageObject[key] = localStorage.getItem(key) as string;
+    }
+  }
+  return JSON.stringify(localStorageObject);
+}
+
+export async function storeLocalStorageInIndexedDB(jsonString: string, key: number): Promise<void> {
+  const dbName = 'shtunkly_localstorages';
+  const storeName = 'ls';
+
+  const request = indexedDB.open(dbName, 1);
+
+  request.onupgradeneeded = function(event) {
+    const db = (event.target as IDBOpenDBRequest).result;
+    if(!db.objectStoreNames.contains(storeName)) {
+      db.createObjectStore(storeName);
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    request.onsuccess = function(event) {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      store.put(jsonString, key);
+
+      transaction.oncomplete = function() {
+        resolve();
+      };
+
+      transaction.onerror = function() {
+        reject(transaction.error);
+      };
+    };
+
+    request.onerror = function() {
+      reject(request.error);
+    };
+  });
+}
+
+export async function replaceLocalStorageFromIndexedDB(key: number): Promise<void> {
+  const dbName = 'shtunkly_localstorages';
+  const storeName = 'ls';
+
+  const request = indexedDB.open(dbName, 1);
+
+  return new Promise((resolve, reject) => {
+    request.onsuccess = function(event) {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const transaction = db.transaction([storeName], 'readonly');
+      const store = transaction.objectStore(storeName);
+      const getRequest = store.get(key);
+
+      getRequest.onsuccess = function() {
+        const jsonString = getRequest.result;
+        if(jsonString) {
+          const localStorageObject = JSON.parse(jsonString);
+          localStorage.clear();
+          for(const [key, value] of Object.entries(localStorageObject)) {
+            localStorage.setItem(key, value as string);
+          }
+        }
+        resolve();
+      };
+
+      getRequest.onerror = function() {
+        reject(getRequest.error);
+      };
+    };
+
+    request.onerror = function() {
+      reject(request.error);
+    };
+  });
+}
+
+export async function dropLocalAccount() {
+  const userId = JSON.parse(localStorage.getItem('user_auth'))?.id as number | undefined;
+  if(!userId) return;
+  const localStorageData = exportLocalStorage();
+  await storeLocalStorageInIndexedDB(localStorageData, userId);
+
+  await saveProfile(userId);
+
+  const dbName = 'tweb';
+  const request = indexedDB.deleteDatabase(dbName);
+  localStorage.clear();
+  // location.reload();
+}
+
+export async function switchToAccount(userId: number) {
+  const currentUserId = JSON.parse(localStorage.getItem('user_auth'))?.id as number | undefined;
+  if(currentUserId) {
+    const localStorageData = exportLocalStorage();
+    await storeLocalStorageInIndexedDB(localStorageData, currentUserId);
+  }
+  await replaceLocalStorageFromIndexedDB(userId);
+  await loadProfile(userId);
+  // location.reload();
+}
+
+
+export async function saveProfile(userId: number): Promise<void> {
+  const data = await exportIndexedDBToJSON('tweb');
+  await importJSONToIndexedDB(data, 'shtunkly_tweb_' + userId);
+  console.log(`Saving profile for user ${userId} into database shtunkly_tweb_${userId} - OK`);
+}
+
+export async function loadProfile(userId: number) {
+  const data = await exportIndexedDBToJSON('shtunkly_tweb_' + userId);
+  await importJSONToIndexedDB(data, 'tweb');
+  console.log(`Loading profile for user ${userId} from database shtunkly_tweb_${userId} - OK`);
+}
+
+if(typeof window !== 'undefined') window.addEventListener('dblclick', () => {
+  window.exportLocalStorage = exportLocalStorage;
+  window.storeLocalStorageInIndexedDB = storeLocalStorageInIndexedDB;
+  window.replaceLocalStorageFromIndexedDB = replaceLocalStorageFromIndexedDB;
+  window.dropLocalAccount = dropLocalAccount;
+  window.switchToAccount = switchToAccount;
+  const isSaving = window.confirm('Do you want to save your profile?');
+  const isLoading = window.confirm('Do you want to load your profile?');
+  if(!isSaving && !isLoading) return;
+  const userId = window.prompt('Enter your user id');
+  if(isSaving) saveProfile(+userId);
+  if(isLoading) loadProfile(+userId);
+})

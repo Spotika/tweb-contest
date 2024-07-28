@@ -64,6 +64,7 @@ export default class AppStorage<
   private deleteDeferred = deferredPromise<void>();
 
   constructor(private db: T, private storeName: typeof db['stores'][number]['name']) {
+    console.warn('difhel', { db, storeName })
     this.storage = new IDBStorage<T>(db, storeName);
 
     if(AppStorage.STORAGES.length) {
