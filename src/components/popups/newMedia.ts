@@ -54,6 +54,10 @@ import {ChatType} from '../chat/chat';
 import pause from '../../helpers/schedulers/pause';
 import {Accessor, createRoot, createSignal, Setter} from 'solid-js';
 import SelectedEffect from '../chat/selectedEffect';
+import Icon from '../icon';
+import Button from '../button';
+import MediaEditor from '../mediaEditor/mediaEditor';
+import {render} from 'solid-js/web';
 
 type SendFileParams = SendFileDetails & {
   file?: File,
@@ -92,6 +96,8 @@ export default class PopupNewMedia extends PopupElement {
   private animationGroup: AnimationItemGroup;
   private _scrollable: Scrollable;
   private inputContainer: HTMLDivElement;
+
+  private mediaEditorActive: boolean = false;
 
   constructor(
     private chat: Chat,
@@ -134,6 +140,75 @@ export default class PopupNewMedia extends PopupElement {
 
     return out;
   }
+
+  private createToolPanel = (
+    item: SendFileParams
+  ): HTMLElement => {
+    const toolPanel = document.createElement('div');
+
+    const toolButton = (
+      icon: Icon,
+      onclick: (event: Event) => any
+    ): HTMLElement => {
+      const iconButton = document.createElement('button');
+      iconButton.append(Icon(icon));
+      iconButton.classList.add('popup-item-tools-button');
+      iconButton.onclick = onclick;
+      return iconButton;
+    }
+
+    toolPanel.classList.add('popup-item-tools');
+
+    // buttons
+    toolPanel.append(toolButton(
+      'enhance',
+      () => {
+        this.mediaEditorActive = true;
+        const mediaEditorContainer = document.createElement('div');
+        mediaEditorContainer.classList.add('media-editor-container');
+        document.body.append(mediaEditorContainer);
+
+        render(() => MediaEditor({
+          parentElement: mediaEditorContainer,
+          file: item.file,
+          saveModifiedFile: async(modified_file: File) => {
+            this.files = this.files.map((file) => {
+              if(file.name == modified_file.name) {
+                return modified_file;
+              }
+              return file;
+            });
+            this.attachFiles();
+          },
+          exitEditor: (() => {
+            this.mediaEditorActive = false;
+          }).bind(this)
+        }), mediaEditorContainer);
+      }
+    ));
+    toolPanel.append(toolButton(
+      'mediaspoiler',
+      () => {
+        if(!item.mediaSpoiler) {
+          this.applyMediaSpoiler(item)
+        }
+      }
+    ));
+    toolPanel.append(toolButton(
+      'delete',
+      () => {
+        this.files = this.files.filter(file => file.name != item.file.name);
+        if(this.files.length == 0) {
+          this.hide();
+          return;
+        }
+        this.attachFiles();
+      }
+    ));
+
+    return toolPanel;
+  }
+
 
   private async construct(willAttachType: PopupNewMedia['willAttach']['type']) {
     this.willAttach = {
@@ -377,6 +452,12 @@ export default class PopupNewMedia extends PopupElement {
   };
 
   private async applyMediaSpoiler(item: SendFileParams, noAnimation?: boolean) {
+    // remove tool panel
+    const tools = item.itemDiv.getElementsByClassName('popup-item-tools')[0];
+    if(tools) {
+      item.itemDiv.removeChild(tools);
+    }
+
     const middleware = item.middlewareHelper.get();
     const {width: widthStr, height: heightStr} = item.itemDiv.style;
 
@@ -454,6 +535,9 @@ export default class PopupNewMedia extends PopupElement {
   }
 
   private removeMediaSpoiler(item: SendFileParams) {
+    // add tool panel
+    item.itemDiv.append(this.createToolPanel(item));
+
     toggleMediaSpoiler({
       mediaSpoiler: item.mediaSpoiler,
       reveal: true,
@@ -590,6 +674,7 @@ export default class PopupNewMedia extends PopupElement {
   };
 
   private async send(force = false) {
+    if(this.mediaEditorActive) return;
     let {value: caption, entities} = getRichValueWithCaret(this.messageInputField.input, true, false);
     if(caption.length > this.captionLengthMax) {
       toast(I18n.format('Error.PreviewSender.CaptionTooLong', true));
@@ -770,7 +855,7 @@ export default class PopupNewMedia extends PopupElement {
 
       let error: Error;
       try {
-        const promise = onMediaLoad(video);
+        const promise = onMediaLoad(video as HTMLMediaElement);
         await handleVideoLeak(video, promise);
       } catch(err) {
         error = err as any;
@@ -794,10 +879,14 @@ export default class PopupNewMedia extends PopupElement {
         url: await apiManagerProxy.invoke('createObjectURL', thumb.blob),
         ...thumb
       };
+
+      itemDiv.append(this.createToolPanel(params));
     } else {
       const img = new Image();
       itemDiv.append(img);
       const url = params.objectURL = await apiManagerProxy.invoke('createObjectURL', file);
+
+      itemDiv.append(this.createToolPanel(params));
 
       await renderImageFromUrlPromise(img, url);
       const mimeType = params.file.type as MTMimeType;
