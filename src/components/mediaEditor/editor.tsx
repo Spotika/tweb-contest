@@ -47,6 +47,90 @@ class DragableObject {
   public id: number;
 
   private static instances: number = 0;
+  private initialMousePos: { x: number, y: number } | null = null;
+
+  public rotation: number = 0;
+  private bufferRotation: number = 0;
+
+  private mouseMove = ((e: MouseEvent) => {
+    if(this.initialMousePos == null) return;
+
+    const dx = e.clientX - this.initialMousePos.x;
+    const dy = e.clientY - this.initialMousePos.y;
+
+    this.wrapper.style.left = `${parseInt(this.wrapper.style.left.split('px')[0]) + dx}px`;
+    this.wrapper.style.top = `${parseInt(this.wrapper.style.top.split('px')[0]) + dy}px`;
+
+    this.initialMousePos = {x: e.clientX, y: e.clientY};
+  }).bind(this);
+
+  private rotationCenter: { x: number, y: number } | null = null;
+  private startRotation: { x: number, y: number} | null = null;
+
+  private rotateMouseMove = ((e: MouseEvent) => {
+    if(this.rotationCenter == null) return;
+    if(this.startRotation == null) return;
+    interface Point {
+      x: number,
+      y: number;
+    }
+
+    function getAngleInRadians(A: Point, B: Point, C: Point): number {
+      // Векторы AB и AC
+      const AB = { x: B.x - A.x, y: B.y - A.y };
+      const AC = { x: C.x - A.x, y: C.y - A.y };
+
+      // Скалярное произведение AB и AC
+      const dotProduct = AB.x * AC.x + AB.y * AC.y;
+
+      // Длины векторов AB и AC
+      const magnitudeAB = Math.hypot(AB.x, AB.y);
+      const magnitudeAC = Math.hypot(AC.x, AC.y);
+
+      // Косинус угла между AB и AC
+      const cosTheta = dotProduct / (magnitudeAB * magnitudeAC);
+
+      // Угол в радианах
+      let angleInRadians = Math.acos(cosTheta);
+
+      // Определитель (или псевдоскалярное произведение) для определения направления
+      const crossProduct = AB.x * AC.y - AB.y * AC.x;
+
+      // Если определитель отрицателен, угол больше 180 градусов
+      if (crossProduct < 0) {
+          angleInRadians = 2 * Math.PI - angleInRadians;
+      }
+
+      return -angleInRadians;
+    }
+
+    let rad = getAngleInRadians(
+      this.rotationCenter,
+      {x: e.clientX, y: e.clientY },
+      this.startRotation,
+    );
+
+
+    // console.log(rad * 180 / Math.PI);
+    // if(rad < 0) {
+    //   rad += Math.PI * 2;
+    // }
+    // console.log(rad);
+    this.bufferRotation = rad;
+    // this.wrapper.style.setProperty('transform', `rotate(${rad + this.rotation}rad)`);
+    this.wrapper.style.rotate = `${rad + this.rotation}rad`;
+    // console.log(this.rotation);
+    // console.log(rad);
+    // Получаем bounding rectangle
+  }).bind(this);
+
+  private rotateMouseUp = ((e: MouseEvent) => {
+    this.rotationCenter = null;
+    this.startRotation = null;
+    this.rotation += this.bufferRotation;
+    this.bufferRotation = 0;
+    this.wrapper.style.rotate = `${this.rotation}rad`;
+  }).bind(this);
 
   constructor(
     content: HTMLElement,
@@ -54,6 +138,7 @@ class DragableObject {
     y: number,
     public recreate: (content: HTMLElement) => void,
     id: number | null = null,
+    rotation: number = 0
   ) {
     if(id === null){
       ++DragableObject.instances;
@@ -62,13 +147,13 @@ class DragableObject {
       this.id = id;
     }
 
-    console.log(this.id);
-
     this.content = content;
 
     const wrapper = this.wrapper = document.createElement('div');
     wrapper.classList.add('dragable-wrapper');
     wrapper.style.position = 'absolute';
+    this.rotation = rotation;
+    wrapper.style.rotate = `${rotation}rad`;
     wrapper.style.left = `${x}px`;
     wrapper.style.top = `${y}px`;
 
@@ -89,7 +174,59 @@ class DragableObject {
     const resizeCornerLB = document.createElement('div');
     resizeCornerLB.classList.add('resize-corner', 'resize-corner-lb');
 
+    const setMouseCenter = (e: MouseEvent) => {
+      const rect = this.wrapper.getBoundingClientRect();
+
+      // Вычисляем центр до поворота
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      // Предположим, что угол поворота известен (например, 45 градусов)
+      // const angleInRadians = this.rotation;
+
+      // // Вычисляем смещения
+      // const offsetX = (rect.width / 2) * Math.cos(angleInRadians) - (rect.height / 2) * Math.sin(angleInRadians);
+      // const offsetY = (rect.width / 2) * Math.sin(angleInRadians) + (rect.height / 2) * Math.cos(angleInRadians);
+
+      // Видимый центр после поворота
+      const visibleCenterX = centerX;
+      const visibleCenterY = centerY;
+
+      this.rotationCenter = {x: visibleCenterX, y: visibleCenterY};
+
+      this.startRotation = {
+        x: e.clientX,
+        y: e.clientY
+      };
+      // const marker = document.createElement('div');
+      // marker.style.width = '10px';
+      // marker.style.height = '10px';
+      // marker.style.position = 'absolute';
+      // marker.style.backgroundColor ='red';
+      // marker.style.left = `${this.rotationCenter.x - 5}px`;
+      // marker.style.top = `${this.rotationCenter.y - 5}px`;
+      // marker.style.zIndex = '9999';
+      // document.body.append(marker);
+    }
+
+    resizeCornerRT.addEventListener('mousedown', setMouseCenter);
+    resizeCornerLT.addEventListener('mousedown', setMouseCenter);
+    resizeCornerRB.addEventListener('mousedown', setMouseCenter);
+    resizeCornerLB.addEventListener('mousedown', setMouseCenter);
+
     wrapper.append(resizeCornerRT, resizeCornerLT, resizeCornerRB, resizeCornerLB, contentContainer);
+
+    contentContainer.addEventListener('mousedown', ((e: MouseEvent) => {
+      this.initialMousePos = {x: e.clientX, y: e.clientY};
+    }).bind(this));
+
+    contentContainer.addEventListener('mouseup', (() => {
+      this.initialMousePos = null;
+    }).bind(this));
+
+    document.addEventListener('mousemove', this.mouseMove);
+    document.addEventListener('mousemove', this.rotateMouseMove);
+    document.addEventListener('mouseup', this.rotateMouseUp);
     recreate(content)
   }
 
@@ -109,13 +246,15 @@ class DragableObject {
   }
 
   public destroy() {
+    document.removeEventListener('mousemove', this.mouseMove);
+    document.removeEventListener('mousemove', this.rotateMouseMove);
+    document.removeEventListener('mouseup', this.rotateMouseUp);
     this.wrapper.remove();
   }
 }
 
 
 class DragableObjectManager {
-
   private savedObjects: {
     id: number
     x: number,
@@ -123,7 +262,8 @@ class DragableObjectManager {
     width: number,
     height: number,
     content: HTMLElement,
-    recreate: (content: HTMLElement) => void
+    recreate: (content: HTMLElement) => void,
+    rotation: number
   }[] = [];
   private style: {
     type?: 'regular' | 'outline' | 'inverse'
@@ -158,7 +298,8 @@ class DragableObjectManager {
       x, y,
       width, height,
       content,
-      recreate: object.recreate
+      recreate: object.recreate,
+      rotation: object.rotation
     }
 
     // this.savedObjects.map((obj) => {});
@@ -198,11 +339,8 @@ class DragableObjectManager {
           continue;
         }
 
-        this.add(new DragableObject(object.content, object.x, object.y, object.recreate, object.id));
-        // this.savedObjects = this.savedObjects.filter((obj) => obj.id != object.id);
-        // this.redraw().then(() => {
-        //   this.editorRef.doCrop();
-        // });
+        this.add(new DragableObject(object.content, object.x, object.y, object.recreate, object.id, object.rotation));
+
 
         this.savedObjects = this.savedObjects.filter((obj) => obj.id != object.id);
         return;
@@ -270,6 +408,20 @@ class DragableObjectManager {
       if(edDiv.innerHTML.slice(-4) == '<br>') {
         edDiv.innerHTML = edDiv.innerHTML.slice(0, -4);
       }
+
+      const foreignDiv = contentCopy.getElementsByClassName('foreign-div')[0] as HTMLDivElement;
+
+      // console.log(foreignDiv.offsetHeight, foreignDiv.offsetWidth);
+      const foreignTop = 2500;
+      const foreignLeft = 2500;
+
+      foreignDiv.style.setProperty('transform', `rotate(${object.rotation}rad)`);
+      foreignDiv.style.setProperty('top', foreignTop + 'px');
+      foreignDiv.style.setProperty('left', foreignTop + 'px');
+
+
+      // console.log(foreignDiv.getBoundingClientRect());
+      // console.log(contentCopy.getBoundingClientRect());
       // html2canvas(
       //   object.content,
       //   {
@@ -299,6 +451,8 @@ class DragableObjectManager {
 
       let reader = new FileReader();
 
+      const editorRef = this.editorRef;
+
       reader.readAsDataURL(svgBlob);
       reader.onload = function(e) {
         const svgDataURL = e.target.result;
@@ -310,9 +464,9 @@ class DragableObjectManager {
           const relY = object.y - canvasRect.top;
 
           // TODO: fix ratio here
-          let x = Math.floor(relX * originCanvas.width / canvasRect.width) + 16;
-          let y = Math.floor(relY * originCanvas.height / canvasRect.height) + 16;
-
+          const k = originCanvas.width / canvasRect.width;
+          let x = Math.floor(relX * k) - foreignLeft;
+          let y = Math.floor(relY * k) - foreignTop;
           ctx.drawImage(image, x, y);
           resolve();
         }
@@ -448,6 +602,9 @@ class DragableObjectManager {
     if(size) {
       this.style.size = size;
       this.activeObject.content.style.setProperty('font-size', (Math.floor(size * 1.5)).toString() + 'px');
+
+      const updateInputEvent = new InputEvent('input');
+      div.dispatchEvent(updateInputEvent);
     }
     if(color) {
       this.style.color = color;
@@ -1302,8 +1459,12 @@ void main() {
 
     const xAX = Math.cos(props.rotation);
     const xAY = Math.sin(props.rotation);
+    rotationCtx.save();
     rotationCtx.setTransform(xAX * props.mirror, xAY * props.mirror, -xAY, xAX, this.properties.crop.canvas.width / 2 - Editor.imagePadding, this.properties.crop.canvas.height / 2 - Editor.imagePadding);
     rotationCtx.drawImage(shtunklyCanvas, -shtunklyCanvas.width / 2, -shtunklyCanvas.height / 2);
+    rotationCtx.restore();
+
+    rotationCtx.setTransform(xAX * -1, xAY * -1, -xAY, xAX, this.properties.crop.canvas.width / 2 - Editor.imagePadding, this.properties.crop.canvas.height / 2 - Editor.imagePadding);
     rotationCtx.drawImage(mergeCanvas, -mergeCanvas.width / 2, -mergeCanvas.height / 2);
 
 
@@ -1842,20 +2003,29 @@ void main() {
 
     const svg = document.createElement('svg');
     svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    svg.setAttribute('width', '200');
-    svg.setAttribute('height', '200');
+    svg.setAttribute('width', '5000');
+    svg.setAttribute('height', '5000');
+    svg.style.setProperty('position', 'absolute');
+    // svg.style.setProperty('top', '50%');
     svg.style.setProperty('font-size', '36px');
     svg.style.setProperty('color', 'white');
     svg.style.setProperty('text-align', 'center');
     svg.style.setProperty('font-family', 'Roboto, serif');
 
     svg.innerHTML = `
-      <foreignObject width="100%" height="100%">
+      <foreignObject x="0" y="0" width="100%" height="100%">
         <style>
           .foreign-div {
-            padding: 20px;
+            // transform: rotate(30deg);
+            position: absolute;
+            overflow: visible;
+            top: 0;
+            left: 0;
+            min-width: 100px;
+            min-height: 100px;
           }
           div[contenteditable] {
+            transform: rotate(30deg);
             border: none;
             background: none;
             min-width: 100px;
@@ -1886,14 +2056,10 @@ void main() {
 
         </style>
           <div class="foreign-div" xmlns="http://www.w3.org/1999/xhtml">
-            <div class="editable-div" contenteditable>
-            test text
-            </div>
+            <div class="editable-div" contenteditable></div>
           </div>
         </foreignObject>
       `;
-
-    // const textArea = document.createElement('input');
 
     const dContainer = new DragableObject(
       svg,
@@ -1902,11 +2068,21 @@ void main() {
       (svg: HTMLElement) => {
         const div = svg.getElementsByClassName('editable-div')[0];
 
+        const foreignDiv = svg.getElementsByClassName('foreign-div')[0];
+
         div.addEventListener('input', () => {
           const rect = div.getBoundingClientRect();
-          svg.setAttribute('height', (rect.height * 10).toString());
-          svg.setAttribute('width', (rect.width + 80).toString());
+          foreignDiv.setAttribute('height', (rect.height).toString());
+          foreignDiv.setAttribute('width', (rect.width).toString());
+
+          const contentContainer = svg.closest('.content-container') as HTMLDivElement;
+          contentContainer.style.setProperty('min-height', (rect.height + 20).toString() + 'px');
+          contentContainer.style.setProperty('min-width', (rect.width + 20).toString() + 'px');
         });
+        setTimeout(() => {
+          const initEvent = new InputEvent('input');
+          div.dispatchEvent(initEvent);
+        }, 10);
       }
     );
     props.dragableManager.add(dContainer);

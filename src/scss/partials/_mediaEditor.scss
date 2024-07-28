@@ -652,8 +652,6 @@
 }
 
 .dragable-wrapper {
-  // width: 100px;
-  // height: 100px;
   overflow: visible !important;
   padding: 10px;
 
@@ -670,6 +668,7 @@
     border-radius: 4px;
     padding: 4px;
     position: absolute;
+    z-index: 100;
 
     &-rt {
       top: -4px;
