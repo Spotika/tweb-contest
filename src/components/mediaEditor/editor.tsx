@@ -1680,11 +1680,32 @@ void main() {
     const props = this.properties.brush;
     const ctx = props.canvas.getContext('2d');
 
+      function blurArea(x: number, y: number) {
+        // Create a temporary canvas to apply the blur filter
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = props.canvas.width;
+        tempCanvas.height = props.canvas.height;
+
+        // Copy the current canvas content to the temporary canvas
+        tempCtx.drawImage(props.canvas, 0, 0);
+
+        // Apply the blur filter to the temporary canvas
+        tempCtx.filter = 'blur(5px)'; // Adjust the blur radius as needed
+        tempCtx.drawImage(tempCanvas, 0, 0);
+
+        // Clear the area to be blurred on the main canvas
+        ctx.clearRect(x - 20, y - 20, 40, 40); // Adjust the size of the blur area
+
+        // Draw the blurred area back onto the main canvas
+        ctx.drawImage(tempCanvas, x - 20, y - 20, 40, 40, x - 20, y - 20, 40, 40);
+    }
+
     let beginPathFrom = 1;
 
     if(paths == 'extendLastPath') {
       var newPaths = [props.paths[props.paths.length - 1]];
-      beginPathFrom = newPaths[0].path.length - 1
+      beginPathFrom = newPaths[0].path.length - 1;
     } else {
       var newPaths = paths;
     }
@@ -1693,16 +1714,18 @@ void main() {
       const {path, color, tool} = pathObj;
       ctx.fillStyle = color;
       ctx.strokeStyle = color;
+      ctx.lineCap = 'round';
 
       for(let i = beginPathFrom; i < path.length; i++) {
         const prevPoint = path[i - 1];
+        if(prevPoint === undefined) continue;
         const currentPoint = path[i];
-        ctx.lineWidth = props.size;
+        ctx.lineWidth = prevPoint.size;
 
         if(tool == 'pen' || tool == 'arrow') {
           ctx.beginPath();
-          ctx.arc(prevPoint.x, prevPoint.y, props.size / 2, 0, Math.PI * 2);
-          ctx.arc(currentPoint.x, currentPoint.y, props.size / 2, 0, Math.PI * 2);
+          ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / 2, 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / 2, 0, Math.PI * 2);
           ctx.fill();
           ctx.closePath();
 
@@ -1710,7 +1733,109 @@ void main() {
           ctx.moveTo(prevPoint.x, prevPoint.y);
           ctx.lineTo(currentPoint.x, currentPoint.y);
           ctx.stroke();
-          ctx.closePath()
+          ctx.closePath();
+        }
+
+        if(tool == 'neon') {
+          // ctx.save();
+          // ctx.lineWidth /= 1.5;
+          // const lineThickness = 1 + Math.sqrt((prevPoint.x - currentPoint.x) ** 2 + (prevPoint.y - prevPoint.y) ** 2) / 5;
+          // ctx.lineWidth = Math.min(lineThickness, 10);
+          // draw();
+          ctx.save();
+          ctx.shadowColor = color; // Устанавливаем цвет тени (белый)
+          ctx.shadowBlur = 20; // Устанавливаем уровень размытия
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = 'white';
+
+          ctx.beginPath();
+          ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(currentPoint.x, currentPoint.y);
+          ctx.stroke();
+          ctx.closePath();
+          ctx.restore();
+        }
+
+        if(tool == 'brush') {
+          // ctx.save();
+          // ctx.lineWidth /= 1.5;
+          // const lineThickness = 1 + Math.sqrt((prevPoint.x - currentPoint.x) ** 2 + (prevPoint.y - prevPoint.y) ** 2) / 5;
+          // ctx.lineWidth = Math.min(lineThickness, 10);
+          // draw();
+          ctx.save();
+          ctx.globalAlpha = 0.1;
+          ctx.fillStyle = color;
+          ctx.strokeStyle = color;
+
+
+          ctx.beginPath();
+          ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(currentPoint.x, currentPoint.y);
+          ctx.stroke();
+          ctx.closePath();
+          ctx.restore();
+        }
+
+        if(tool == 'eraser') {
+          // ctx.save();
+          // ctx.lineWidth /= 1.5;
+          // const lineThickness = 1 + Math.sqrt((prevPoint.x - currentPoint.x) ** 2 + (prevPoint.y - prevPoint.y) ** 2) / 5;
+          // ctx.lineWidth = Math.min(lineThickness, 10);
+          // draw();
+          ctx.save();
+          // ctx.fillStyle = color;
+          // ctx.strokeStyle = color;
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.beginPath();
+          ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(currentPoint.x, currentPoint.y);
+          ctx.stroke();
+          ctx.closePath();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.restore();
+        }
+
+        if(tool == 'blur') {
+          ctx.save();
+          // ctx.fillStyle = color;
+          // ctx.strokeStyle = color;
+          // ctx.globalCompositeOperation = 'destination-out';
+          ctx.filter = "blur(4px)";
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.beginPath();
+          ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(currentPoint.x, currentPoint.y);
+          ctx.stroke();
+          ctx.closePath();
+          // ctx.globalCompositeOperation = 'source-over';
+          ctx.restore();
+
+          // blurArea(currentPoint.x, currentPoint.y);
         }
       }
 
@@ -1741,6 +1866,61 @@ void main() {
         ctx.fill();
       }
     }
+
+
+    // for(const pathObj of newPaths) {
+    //   const {path, color, tool} = pathObj;
+    //   ctx.fillStyle = color;
+    //   ctx.strokeStyle = color;
+    //   for(let i = beginPathFrom; i < path.length; i++) {
+    //     const prevPoint = path[i - 1];
+    //     if(prevPoint === undefined) continue;
+    //     const currentPoint = path[i];
+    //     ctx.lineWidth = prevPoint.size;
+
+    //     // if(tool == 'pen' || tool == 'arrow' || tool == 'neon') {
+    //     //   ctx.beginPath();
+    //     //   ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / 2, 0, Math.PI * 2);
+    //     //   ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / 2, 0, Math.PI * 2);
+    //     //   ctx.fill();
+    //     //   ctx.closePath();
+
+    //     //   ctx.beginPath();
+    //     //   ctx.moveTo(prevPoint.x, prevPoint.y);
+    //     //   ctx.lineTo(currentPoint.x, currentPoint.y);
+    //     //   ctx.stroke();
+    //     //   ctx.closePath();
+    //     // }
+    //     if(tool == 'neon') {
+    //       // ctx.save();
+    //       // ctx.lineWidth /= 1.5;
+    //       // const lineThickness = 1 + Math.sqrt((prevPoint.x - currentPoint.x) ** 2 + (prevPoint.y - prevPoint.y) ** 2) / 5;
+    //       // ctx.lineWidth = Math.min(lineThickness, 10);
+    //       // draw();
+    //       ctx.save();
+    //       ctx.shadowColor = color; // Устанавливаем цвет тени (белый)
+    //       ctx.shadowBlur = 20; // Устанавливаем уровень размытия
+    //       ctx.fillStyle = 'white';
+    //       ctx.strokeStyle = color;
+
+    //       ctx.beginPath();
+    //       ctx.arc(prevPoint.x, prevPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+    //       ctx.arc(currentPoint.x, currentPoint.y, prevPoint.size / (2), 0, Math.PI * 2);
+    //       ctx.fill();
+    //       ctx.closePath();
+
+    //       ctx.beginPath();
+    //       ctx.moveTo(prevPoint.x, prevPoint.y);
+    //       ctx.lineTo(currentPoint.x, currentPoint.y);
+    //       ctx.fill();
+    //       ctx.closePath();
+    //       ctx.restore();
+    //     }
+    //   }
+    // }
+
+
+
   }
 
 
@@ -2252,22 +2432,21 @@ void main() {
 
     // TODO: create transition from wrapper canvas to wrapped canvas
 
-    let x = cos*x1 - sin*y1;
-    let y = sin*x1 + cos*y1;
+    let x = x1;
+    let y = y1;
 
     // console.log(x, y, props.canvas.width, props.canvas.height, sin, cos);
 
-
-    if(sin > 0 && cos > 0) {
-      const w = sin * props.canvas.width;
-      x += sin * w;
-      y -= cos * w;
-    } else if(sin < 0 && cos > 0) {
-      // const w = props.canvas.height * cos;
-      // x +=
-      // y -= w * cos;
-      // x -= w * sin;
-    }
+    // if(sin > 0 && cos > 0) {
+    //   const w = sin * props.canvas.width;
+    //   x += sin * w;
+    //   y -= cos * w;
+    // } else if(sin < 0 && cos > 0) {
+    //   // const w = props.canvas.height * cos;
+    //   // x +=
+    //   // y -= w * cos;
+    //   // x -= w * sin;
+    // }
 
     path.push({
         x, y,
