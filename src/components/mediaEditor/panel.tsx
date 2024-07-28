@@ -143,6 +143,7 @@ class Panel {
   private undoButton: HTMLButtonElement;
   private redoButton: HTMLButtonElement;
 
+  private emoticonsDropdown: EmoticonsDropdown;
 
   constructor(
     renderElement: HTMLElement,
@@ -230,6 +231,14 @@ class Panel {
         this.editorRef.enableTextMode();
       } else {
         this.editorRef.disableTextMode();
+      }
+
+      if(id == 4) {
+        this.emoticonsDropdown?.toggle(true);
+        this.editorRef.enableStickersMode();
+      } else {
+        this.emoticonsDropdown?.toggle(false);
+        this.editorRef.disableStickersMode();
       }
     });
     this.selectTab(0, false); // TODO: change to 0 if not debug
@@ -1035,7 +1044,7 @@ class Panel {
 
   private createSmileTab() {
     const container = this.tabs.smile;
-    const emoticonsDropdown = new EmoticonsDropdown({
+    this.emoticonsDropdown = new EmoticonsDropdown({
       customParentElement: container,
       tabsToRender: [new StickersTab(rootScope.managers)],
       stayAlwaysOpen: true,
@@ -1048,10 +1057,10 @@ class Panel {
       onMediaClicked: (e: any) => {
         const el = e.target as HTMLDivElement;
         const stickerId = el.dataset['docId'];
-        alert(stickerId);
+        this.editorRef.addSticker(stickerId);
       }
     });
-    emoticonsDropdown.toggle(false);
+    this.emoticonsDropdown.toggle(false);
   }
 
   private updateActions() {

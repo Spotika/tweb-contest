@@ -56,7 +56,8 @@ export default class SuperStickerRenderer {
     doc: MyDocument,
     element?: HTMLElement,
     loadPromises?: Promise<any>[],
-    middleware?: Middleware
+    middleware?: Middleware,
+    onReady?: () => void,
   ) {
     if(!element) {
       element = document.createElement('div');
@@ -71,7 +72,8 @@ export default class SuperStickerRenderer {
     element.middlewareHelper ??= middleware ? middleware.create() : getMiddleware();
 
     // * This will wrap only a thumb
-    /* !doc.animated &&  */ wrapSticker({
+    /* !doc.animated &&  */
+    const result = wrapSticker({
       doc,
       div: element,
       lazyLoadQueue: this.regularLazyLoadQueue,
@@ -81,6 +83,10 @@ export default class SuperStickerRenderer {
       middleware: element.middlewareHelper.get(),
       ...(doc.animated ? {} : this.visibleRenderOptions || {})
     });
+
+    if(onReady) {
+      result.then(r => r.render).then(() => onReady());
+    }
 
     return element;
   }
