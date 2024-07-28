@@ -650,3 +650,49 @@
     pointer-events: none;
   }
 }
+
+.dragable-wrapper {
+  // width: 100px;
+  // height: 100px;
+  overflow: visible !important;
+  padding: 10px;
+
+  border: dashed 2px #FFFFFF30;
+
+  .content-container {
+    // color: black;
+  }
+
+  .resize-corner {
+    background-color: white;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    padding: 4px;
+    position: absolute;
+
+    &-rt {
+      top: -4px;
+      right: -4px;
+      cursor: ne-resize;
+    }
+
+    &-lt {
+      left: -4px;
+      top: -4px;
+      cursor: nw-resize;
+    }
+
+    &-rb {
+      right: -4px;
+      bottom: -4px;
+      cursor: se-resize
+    }
+
+    &-lb {
+      left: -4px;
+      bottom: -4px;
+      cursor: sw-resize;
+    }
+  }
+}

@@ -97,6 +97,8 @@ export default class PopupNewMedia extends PopupElement {
   private _scrollable: Scrollable;
   private inputContainer: HTMLDivElement;
 
+  private mediaEditorActive: boolean = false;
+
   constructor(
     private chat: Chat,
     private files: File[],
@@ -161,6 +163,7 @@ export default class PopupNewMedia extends PopupElement {
     toolPanel.append(toolButton(
       'enhance',
       () => {
+        this.mediaEditorActive = true;
         const mediaEditorContainer = document.createElement('div');
         mediaEditorContainer.classList.add('media-editor-container');
         document.body.append(mediaEditorContainer);
@@ -176,7 +179,10 @@ export default class PopupNewMedia extends PopupElement {
               return file;
             });
             this.attachFiles();
-          }
+          },
+          exitEditor: (() => {
+            this.mediaEditorActive = false;
+          }).bind(this)
         }), mediaEditorContainer);
       }
     ));
@@ -668,6 +674,7 @@ export default class PopupNewMedia extends PopupElement {
   };
 
   private async send(force = false) {
+    if(this.mediaEditorActive) return;
     let {value: caption, entities} = getRichValueWithCaret(this.messageInputField.input, true, false);
     if(caption.length > this.captionLengthMax) {
       toast(I18n.format('Error.PreviewSender.CaptionTooLong', true));

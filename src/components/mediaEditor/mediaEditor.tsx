@@ -9,6 +9,7 @@ const MediaEditor = (
     parentElement: HTMLElement,
     file: File,
     saveModifiedFile: (file: File) => void
+    exitEditor: () => void
   }
 ) => {
   let editor: Editor;
@@ -24,13 +25,14 @@ const MediaEditor = (
   const exitEditor = () => {
     clearInterval(editor.refreshIntervalId);
     params.parentElement.remove();
+    params.exitEditor();
   }
 
   return <>
     <div ref={editorContainer}></div>
     <div ref={panelContainer}></div>
     <ButtonIconTsx onclick={async() => {
-      params.saveModifiedFile(await editor.getModifiedFile(params.file.name))
+      params.saveModifiedFile(await editor.getModifiedFile(params.file.name));
       exitEditor();
     }} class="save" icon="check1"/>
   </>

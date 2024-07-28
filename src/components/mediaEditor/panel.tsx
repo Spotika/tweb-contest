@@ -861,11 +861,16 @@ class Panel {
     const container = this.tabs.text;
 
     const colorPicker = new EditorColorPicker((color) => {
+      this.editorRef.properties.text.dragableManager?.changeStyle({
+        color: color
+      })
     }, 'text');
+    // this.editorRef.properties.text.dragableManager.changeStyle({
+    //   color: 'white'
+    // });
 
-
-    const createButtonContext = (buttons: HTMLButtonElement[], onChange: (key: string) => void) => {
-      let activeButton = buttons[0];
+    const createButtonContext = (buttons: HTMLButtonElement[], onChange: (key: string) => void, firstActive: number) => {
+      let activeButton = buttons[firstActive];
       activeButton.classList.add('active');
 
       for(const button of buttons) {
@@ -904,8 +909,10 @@ class Panel {
       ]
       alignContainer.append(...alignButtons);
       createButtonContext(alignButtons, (key: string) => {
-
-      });
+        this.editorRef.properties.text.dragableManager.changeStyle({
+          align: key as any,
+        });
+      }, 1);
 
 
       const strokeContainer = document.createElement('div');
@@ -917,7 +924,11 @@ class Panel {
         createVariantButton('textinverse', 'inverse'),
       ]
       strokeContainer.append(...strokeButtons);
-      createButtonContext(strokeButtons, (key: string) => {});
+      createButtonContext(strokeButtons, (key: string) => {
+        this.editorRef.properties.text.dragableManager.changeStyle({
+          type: key as any
+        });
+      }, 2);
 
       textVariantsContainer.append(alignContainer, strokeContainer);
     }
@@ -950,6 +961,9 @@ class Panel {
 
       slider.input.addEventListener('input', () => {
         valueContainer.textContent = slider.input.value;
+        this.editorRef.properties.text.dragableManager.changeStyle({
+          size: parseInt(slider.input.value)
+        })
       });
 
       sizeSelectWrapper.append(textWrapper, slider.container);
@@ -1005,7 +1019,11 @@ class Panel {
       }
 
       const fontButtons = fonts.map(createFontButton);
-      createButtonContext(fontButtons, (font: string) => {});
+      createButtonContext(fontButtons, (font: string) => {
+        this.editorRef.properties.text.dragableManager.changeStyle({
+          fontFamily: font,
+        });
+      }, 0);
       fontSelectWrapper.append(title,...fontButtons);
     }
 
@@ -1033,7 +1051,7 @@ class Panel {
         alert(stickerId);
       }
     });
-    emoticonsDropdown.toggle(true);
+    emoticonsDropdown.toggle(false);
   }
 
   private updateActions() {
